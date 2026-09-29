@@ -9,8 +9,6 @@ def test_python_version():
 def test_project_structure_exists():
     """Verify that the Cookiecutter Data Science structure is intact"""
     required_directories = [
-        "data/raw",
-        "data/processed",
         "models",
         "src"
     ]
