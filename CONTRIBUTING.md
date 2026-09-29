@@ -1,5 +1,5 @@
 # Contributing Guidelines — Spam Detection ML System
-Here you can find the documentation to maintain high code quality, system reproducibility, and good collaboration, all team members must follow this guide for every contribution.
+Here you can find the documentation to maintain high code quality, system reproducibility, and good collaboration. All team members must follow this guide for every contribution.
 
 ---
 
@@ -7,9 +7,9 @@ Here you can find the documentation to maintain high code quality, system reprod
 
 We strictly adhere to **GitHub Flow**:
 - The `main` branch is **always deployable** and production-ready.
-- All development is conducted in a short feature, bugfix, or task branches created directly from `dev`.
-- Direct commits to `main` are strictly prohibited (are protected).
-- All merges require a reviewed and approved Pull Request (PR).
+- All development is conducted in short feature, bugfix, or task branches created directly from `main`.
+- Direct commits to `main` are strictly prohibited (the branch is protected).
+- All merges require a passing CI/CD test suite and a reviewed, approved Pull Request (PR).
 
 ---
 
@@ -21,10 +21,10 @@ Before writing code:
 2. (Create) and assign the task to yourself and mark it as *In Progress*. Note the issue ID (e.g., `#12`).
 
 ### Step 2: Create a Feature Branch
-Ensure your local `dev` is completely up-to-date, then branch off:
+Ensure your local `main` is completely up-to-date, then branch off:
 ```bash
-git checkout dev
-git pull origin dev
+git checkout main
+git pull origin main
 git checkout -b <type>/<issue-id>-<short-description>
 ```
 
@@ -69,17 +69,23 @@ Push changes to the remote feature branch:
 git push -u origin <branch-name>
 ```
 
-### Step 6: Open a Pull Request (PR)
-1. Open the PR targeting base: main from compare: <branch-name>.
-2. Follow the PR template (summarize changes, link the issue with Closes #<id>, and list tested items).
+### Step 5: Open a Pull Request (PR)
+1. Open the PR targeting ```base: main``` from ```compare: <branch-name>```.
+2. Link the issue with Closes #<id>, and list tested items).
 3. Request a review from at least one teammate.
 
-### Step 7: Code Review & Discussion
-* The reviewer tests the code locally or inspects the diff.
-* If updates are needed, make additional commits to the same branch and push.
-* Once approved with at least 1 sign-off, merge using a clean merge / fast-forward as appropriate.
+### Step 6: Automated CI/CD Tests & Code Review
+* **Continuous Integration:** GitHub Actions will automatically run the integration test suite (Pytest, Flake8) against your branch. These checks must pass before merging.   
+* **Peer Review:** The reviewer tests the code locally or inspects the diff. If updates are needed, make additional commits to the same branch and push.
+
+### Step 7: Squash and Merge
+Our repository is configured to strictly enforce **Squash and Merge**.
+* Once approved and all CI checks pass, click Squash and merge.
+* Ensure the final squashed commit message adheres to the 7 Git commit rules, summarizing the entire PR.
 * Delete the feature branch after merging to keep the repository clean:
-```bash
-git branch -d <branch-name>
-git push origin --delete <branch-name>
-```
+    ```bash
+    git checkout main
+    git pull origin main
+    git branch -d <branch-name>
+    git push origin --delete <branch-name>
+    ```
