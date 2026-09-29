@@ -10,7 +10,6 @@ Spam detection ML system with spam detection, summarization, and automated feedb
 
 ```
 ├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
 ├── README.md          <- The top-level README for developers using this project.
 ├── data
 │   ├── external       <- Data from third party sources.
@@ -39,22 +38,24 @@ Spam detection ML system with spam detection, summarization, and automated feedb
 │
 ├── setup.cfg          <- Configuration file for flake8
 │
-└── message_guard   <- Source code for use in this project.
+└── src   <- Source code for use in this project.
     │
-    ├── __init__.py             <- Makes message_guard a Python module
+    ├── __init__.py             <- Makes src a Python module
     │
     ├── config.py               <- Store useful variables and configuration
     │
-    ├── dataset.py              <- Scripts to download or generate data
+    ├── dataset.py              <- Data ingestion pipeline
     │
-    ├── features.py             <- Code to create features for modeling
+    ├── features.py             <- Data transformations and feature engineering
     │
     ├── modeling                
     │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
+    │   ├── predict.py          <- Inference wrappers for model serving          
+    │   └── train.py            <- Training loop with MLflow tracking and CodeCarbon
     │
-    └── plots.py                <- Code to create visualizations
+    ├── api/                    <- Web API for inference and feedback collection
+    │
+    └── monitoring/             <- Data drift detection and performance monitoring
 ```
 
 --------
