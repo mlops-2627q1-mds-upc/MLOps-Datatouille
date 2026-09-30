@@ -1,0 +1,39 @@
+name: Continuous Integration Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  quality-assurance:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install testing and linting tools alongside project requirements
+          pip install pytest flake8
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Static Code Analysis (Flake8)
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all other warnings as non-fatal for now
+          flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run Automated Regression Tests (Pytest)
+        run: |
+          pytest tests/ -v
