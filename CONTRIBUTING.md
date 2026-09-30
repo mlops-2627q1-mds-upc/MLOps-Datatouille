@@ -89,3 +89,67 @@ Our repository is configured to strictly enforce **Squash and Merge**.
     git branch -d <branch-name>
     git push origin --delete <branch-name>
     ```
+
+---
+
+## 3. Coding Good Practices
+
+Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
+
+* Use 4 spaces per indent level. Do not use tabs.
+* Keep lines short (max 127 chars to pass CI, aim for ~99).
+* Use blank lines to separate logic:
+    * 2 blank lines around top-level functions and classes.
+    * 1 blank line around methods inside a class.
+* Put spaces around operators (`x = 1`, not `x=1`) and after commas (`f(a, b)`, not `f(a,b)`).
+* Use type hints for all function arguments and return values.
+* Naming:
+    * Use `snake_case` for functions and variables: `my_func`, `clean_text`, `spam_threshold`.
+    * Do not use `camelCase`: `myFunc`, `cleanText` are not allowed.
+    * Use `PascalCase` for classes: `SpamClassifier`.
+    * Use `UPPER_CASE` for constants: `MAX_TOKENS = 512`.
+    * Use clear names: `clean_text()` not `f1()`, `spam_threshold` not `x`.
+* Keep functions short and with one task only. If a function exceeds ~50 lines, split it.
+* Do not use magic numbers. Move constants to `src/config.py`.
+* Do not hardcode paths. Use `pathlib.Path` and config values.
+* Do not use `print()`. Use `logging` instead.
+* Sort imports in 3 groups: stdlib, third-party, first-party (`src`). Remove unused imports.
+  ```python
+  import logging
+  from pathlib import Path
+
+  import pandas as pd
+  from sklearn.model_selection import train_test_split
+
+  from src.config import DATA_PATH
+  ```
+* Set random seeds (`random`, `numpy`, `sklearn`) for reproducibility.
+* Add a Pytest test for each new function in `src/`.
+* Do not commit dead code, commented code, or debug files.
+
+### 3.1 Function Documentation: Google Python Style
+
+* Document all public functions, classes, and methods.
+* Use Google Style docstrings.
+* Include: short summary, `Args:`, `Returns:`, `Raises:` (if applicable).
+* Keep summary in imperative mood and in one line.
+
+Example:
+```python
+def clean_text(text: str, lowercase: bool = True) -> str:
+    """Clean raw message text for spam classification.
+
+    Args:
+        text: Raw input message.
+        lowercase: If True, convert text to lowercase.
+
+    Returns:
+        Cleaned text string.
+
+    Raises:
+        ValueError: If text is empty.
+    """
+    if not text:
+        raise ValueError("text must not be empty.")
+    ...
+```
