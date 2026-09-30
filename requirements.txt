@@ -1,4 +1,5 @@
 awscli
+datasets
 loguru
 mkdocs
 pip
