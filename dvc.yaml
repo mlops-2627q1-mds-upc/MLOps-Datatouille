@@ -39,7 +39,7 @@ stages:
         --model ${item}
         --train ${split.train}
         --model-out models/${item}.joblib
-        --metrics-out metrics/${item}.json
+        --metrics-out reports/metrics/${item}.json
         --label-col ${data.label_col}
         --max-features ${train.max_features}
         --cv-folds ${train.cv_folds}
@@ -50,5 +50,5 @@ stages:
       outs:
         - models/${item}.joblib
       metrics:
-        - metrics/${item}.json:
+        - reports/metrics/${item}.json:
             cache: false
