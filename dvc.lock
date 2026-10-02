@@ -1,0 +1,51 @@
+schema: '2.0'
+stages:
+  preprocess:
+    cmd: python -m src.phase_1_cleaning --input 
+      data/raw/daisy_dataset_spam_detection.csv --output 
+      data/processed/clean.csv --text-col text --label-col label --encoding 
+      utf-8
+    deps:
+    - path: data/raw/daisy_dataset_spam_detection.csv
+      hash: md5
+      md5: 9829bca4ac766386b1f64e20ce8ebd8e
+      size: 3130581
+    - path: src/phase_1_cleaning.py
+      hash: md5
+      md5: 4a7e3015d18c444e1163bba4e4676e95
+      size: 2569
+    - path: src/preprocess.py
+      hash: md5
+      md5: 63eff6c413c38570cbc7875377e8594e
+      size: 7144
+    outs:
+    - path: data/processed/clean.csv
+      hash: md5
+      md5: 5ba4f6b4fd722801f8606431a0831075
+      size: 4740957
+  split:
+    cmd: python -m src.phase_2_splitting --input data/processed/clean.csv 
+      --train data/dataset/train.csv --test data/dataset/test.csv --label-col 
+      label --test-size 0.2 --random-state 42
+    deps:
+    - path: data/processed/clean.csv
+      hash: md5
+      md5: 5ba4f6b4fd722801f8606431a0831075
+      size: 4740957
+    - path: src/phase_2_splitting.py
+      hash: md5
+      md5: bbd6d1332b2dae73a8bf5cf0c487f89c
+      size: 1555
+    - path: src/preprocess.py
+      hash: md5
+      md5: 63eff6c413c38570cbc7875377e8594e
+      size: 7144
+    outs:
+    - path: data/dataset/test.csv
+      hash: md5
+      md5: 5d8206e447a493f56698a36814d2080f
+      size: 982635
+    - path: data/dataset/train.csv
+      hash: md5
+      md5: 440be6a01ef0e722d48de330f3692cb5
+      size: 3758419

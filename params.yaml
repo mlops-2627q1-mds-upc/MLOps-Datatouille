@@ -1,0 +1,12 @@
+data:
+  raw: data/raw/daisy_dataset_spam_detection.csv
+  clean: data/processed/clean.csv
+  text_col: text
+  label_col: label
+  encoding: utf-8
+
+split:
+  train: data/dataset/train.csv
+  test: data/dataset/test.csv
+  test_size: 0.2
+  random_state: 42

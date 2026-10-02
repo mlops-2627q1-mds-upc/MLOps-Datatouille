@@ -1,0 +1,32 @@
+stages:
+  preprocess:
+    cmd: >-
+      python -m src.phase_1_cleaning
+      --input ${data.raw}
+      --output ${data.clean}
+      --text-col ${data.text_col}
+      --label-col ${data.label_col}
+      --encoding ${data.encoding}
+    deps:
+      - ${data.raw}
+      - src/preprocess.py
+      - src/phase_1_cleaning.py
+    outs:
+      - ${data.clean}
+
+  split:
+    cmd: >-
+      python -m src.phase_2_splitting
+      --input ${data.clean}
+      --train ${split.train}
+      --test ${split.test}
+      --label-col ${data.label_col}
+      --test-size ${split.test_size}
+      --random-state ${split.random_state}
+    deps:
+      - ${data.clean}
+      - src/preprocess.py
+      - src/phase_2_splitting.py
+    outs:
+      - ${split.train}
+      - ${split.test}
