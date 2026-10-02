@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src import preprocess as pp
+from src.data_preparation import preprocess as pp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)

@@ -10,3 +10,9 @@ split:
   test: data/dataset/test.csv
   test_size: 0.2
   random_state: 42
+
+train:
+  models: [logreg, naive_bayes, linear_svm, random_forest]
+  max_features: 3000
+  cv_folds: 5
+  random_state: 42

@@ -1,7 +1,7 @@
 stages:
   preprocess:
     cmd: >-
-      python -m src.phase_1_cleaning
+      python -m src.data_preparation.phase_1_cleaning
       --input ${data.raw}
       --output ${data.clean}
       --text-col ${data.text_col}
@@ -9,14 +9,14 @@ stages:
       --encoding ${data.encoding}
     deps:
       - ${data.raw}
-      - src/preprocess.py
-      - src/phase_1_cleaning.py
+      - src/data_preparation/preprocess.py
+      - src/data_preparation/phase_1_cleaning.py
     outs:
       - ${data.clean}
 
   split:
     cmd: >-
-      python -m src.phase_2_splitting
+      python -m src.data_preparation.phase_2_splitting
       --input ${data.clean}
       --train ${split.train}
       --test ${split.test}
@@ -25,8 +25,30 @@ stages:
       --random-state ${split.random_state}
     deps:
       - ${data.clean}
-      - src/preprocess.py
-      - src/phase_2_splitting.py
+      - src/data_preparation/preprocess.py
+      - src/data_preparation/phase_2_splitting.py
     outs:
       - ${split.train}
       - ${split.test}
+
+  train:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.phase_3_training
+        --model ${item}
+        --train ${split.train}
+        --model-out models/${item}.joblib
+        --metrics-out metrics/${item}.json
+        --label-col ${data.label_col}
+        --max-features ${train.max_features}
+        --cv-folds ${train.cv_folds}
+        --random-state ${train.random_state}
+      deps:
+        - ${split.train}
+        - src/modeling/phase_3_training.py
+      outs:
+        - models/${item}.joblib
+      metrics:
+        - metrics/${item}.json:
+            cache: false

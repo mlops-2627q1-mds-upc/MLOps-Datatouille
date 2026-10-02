@@ -1,7 +1,7 @@
 schema: '2.0'
 stages:
   preprocess:
-    cmd: python -m src.phase_1_cleaning --input 
+    cmd: python -m src.data_preparation.phase_1_cleaning --input 
       data/raw/daisy_dataset_spam_detection.csv --output 
       data/processed/clean.csv --text-col text --label-col label --encoding 
       utf-8
@@ -10,11 +10,11 @@ stages:
       hash: md5
       md5: 9829bca4ac766386b1f64e20ce8ebd8e
       size: 3130581
-    - path: src/phase_1_cleaning.py
+    - path: src/data_preparation/phase_1_cleaning.py
       hash: md5
-      md5: 4a7e3015d18c444e1163bba4e4676e95
-      size: 2569
-    - path: src/preprocess.py
+      md5: 21de4b3822dffe01828b4bab033156c2
+      size: 2559
+    - path: src/data_preparation/preprocess.py
       hash: md5
       md5: 63eff6c413c38570cbc7875377e8594e
       size: 7144
@@ -24,19 +24,19 @@ stages:
       md5: 5ba4f6b4fd722801f8606431a0831075
       size: 4740957
   split:
-    cmd: python -m src.phase_2_splitting --input data/processed/clean.csv 
-      --train data/dataset/train.csv --test data/dataset/test.csv --label-col 
-      label --test-size 0.2 --random-state 42
+    cmd: python -m src.data_preparation.phase_2_splitting --input 
+      data/processed/clean.csv --train data/dataset/train.csv --test 
+      data/dataset/test.csv --label-col label --test-size 0.2 --random-state 42
     deps:
     - path: data/processed/clean.csv
       hash: md5
       md5: 5ba4f6b4fd722801f8606431a0831075
       size: 4740957
-    - path: src/phase_2_splitting.py
+    - path: src/data_preparation/phase_2_splitting.py
       hash: md5
-      md5: bbd6d1332b2dae73a8bf5cf0c487f89c
-      size: 1555
-    - path: src/preprocess.py
+      md5: 426df2119ae5440b7dd364b401259412
+      size: 1572
+    - path: src/data_preparation/preprocess.py
       hash: md5
       md5: 63eff6c413c38570cbc7875377e8594e
       size: 7144
@@ -49,3 +49,95 @@ stages:
       hash: md5
       md5: 440be6a01ef0e722d48de330f3692cb5
       size: 3758419
+  train@logreg:
+    cmd: python -m src.modeling.phase_3_training --model logreg --train 
+      data/dataset/train.csv --model-out models/logreg.joblib --metrics-out 
+      metrics/logreg.json --label-col label --max-features 3000 --cv-folds 5 
+      --random-state 42
+    deps:
+    - path: data/dataset/train.csv
+      hash: md5
+      md5: 440be6a01ef0e722d48de330f3692cb5
+      size: 3758419
+    - path: src/modeling/phase_3_training.py
+      hash: md5
+      md5: 8ecd7fef49d9bbea20628e7481635f7a
+      size: 4671
+    outs:
+    - path: metrics/logreg.json
+      hash: md5
+      md5: b289323b98de5615170731d6ef7bd957
+      size: 142
+    - path: models/logreg.joblib
+      hash: md5
+      md5: 16fa5272c7e81a263886d06ad061836b
+      size: 134529
+  train@naive_bayes:
+    cmd: python -m src.modeling.phase_3_training --model naive_bayes --train 
+      data/dataset/train.csv --model-out models/naive_bayes.joblib --metrics-out
+      metrics/naive_bayes.json --label-col label --max-features 3000 --cv-folds 
+      5 --random-state 42
+    deps:
+    - path: data/dataset/train.csv
+      hash: md5
+      md5: 440be6a01ef0e722d48de330f3692cb5
+      size: 3758419
+    - path: src/modeling/phase_3_training.py
+      hash: md5
+      md5: 8ecd7fef49d9bbea20628e7481635f7a
+      size: 4671
+    outs:
+    - path: metrics/naive_bayes.json
+      hash: md5
+      md5: a79332e6bde81a480b87bb9f6ae9c988
+      size: 142
+    - path: models/naive_bayes.joblib
+      hash: md5
+      md5: d9ad2f97bb78ea1ae958537a5e666776
+      size: 206569
+  train@linear_svm:
+    cmd: python -m src.modeling.phase_3_training --model linear_svm --train 
+      data/dataset/train.csv --model-out models/linear_svm.joblib --metrics-out 
+      metrics/linear_svm.json --label-col label --max-features 3000 --cv-folds 5
+      --random-state 42
+    deps:
+    - path: data/dataset/train.csv
+      hash: md5
+      md5: 440be6a01ef0e722d48de330f3692cb5
+      size: 3758419
+    - path: src/modeling/phase_3_training.py
+      hash: md5
+      md5: 8ecd7fef49d9bbea20628e7481635f7a
+      size: 4671
+    outs:
+    - path: metrics/linear_svm.json
+      hash: md5
+      md5: de0916a2999ecc353d253185e491c912
+      size: 142
+    - path: models/linear_svm.joblib
+      hash: md5
+      md5: 8d479b165644a3ca72178f5e99cd8248
+      size: 134413
+  train@random_forest:
+    cmd: python -m src.modeling.phase_3_training --model random_forest --train 
+      data/dataset/train.csv --model-out models/random_forest.joblib 
+      --metrics-out metrics/random_forest.json --label-col label --max-features 
+      3000 --cv-folds 5 --random-state 42
+    deps:
+    - path: data/dataset/train.csv
+      hash: md5
+      md5: 440be6a01ef0e722d48de330f3692cb5
+      size: 3758419
+    - path: src/modeling/phase_3_training.py
+      hash: md5
+      md5: 8ecd7fef49d9bbea20628e7481635f7a
+      size: 4671
+    outs:
+    - path: metrics/random_forest.json
+      hash: md5
+      md5: ef9f0b69da6077ab2e03249fe7f3d3af
+      size: 142
+    - path: models/random_forest.joblib
+      hash: md5
+      md5: ee0b057e26eaba5b718287c2f43946c1
+      size: 20403602

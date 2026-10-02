@@ -1,4 +1,4 @@
-"""Tests unitarios de src/preprocessing.py.
+"""Tests unitarios de src/data_preparation/preprocess.py.
 
 Ejecutar desde la raíz del proyecto:
     pytest -v
@@ -7,7 +7,7 @@ Ejecutar desde la raíz del proyecto:
 import pandas as pd
 import pytest
 
-from src import preprocess as pp
+from src.data_preparation import preprocess as pp
 
 
 # ---------------------------------------------------------------------------
