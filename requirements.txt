@@ -7,4 +7,6 @@ python-dotenv
 ruff
 tqdm
 typer
+matplotlib
+mlflow
 -e .
