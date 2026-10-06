@@ -24,10 +24,10 @@ jobs:
           cache: 'pip'
     
       - name: Install Dependencies
-          run: |
-            python -m pip install --upgrade pip
-            pip install pytest flake8 pylint great_expectations fastapi httpx
-            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest flake8 pylint great_expectations fastapi httpx
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Static Code Analysis (Flake8 & Pylint)
         run: |
@@ -46,9 +46,7 @@ jobs:
         run: |
           echo "Executing Great Expectations against a 100-row sample of Deysi/spam-detection-dataset"
 
-  # ==========================================
   # JOB 2: DEV -> MAIN
-  # ==========================================
   comprehensive-validation:
     name: Comprehensive Pre-Production Validation
     if: github.base_ref == 'main'
