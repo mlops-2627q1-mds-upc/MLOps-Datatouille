@@ -11,6 +11,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Enforce PR source branch
+        if: github.head_ref != 'dev'
+        run: |
+          echo "Error: Pull requests targeting 'main' are only allowed from the 'dev' branch."
+          echo "Current source branch is: ${{ github.head_ref }}"
+          exit 1
+          
       - name: Checkout Repository
         uses: actions/checkout@v3
 
