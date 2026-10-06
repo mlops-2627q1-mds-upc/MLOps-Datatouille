@@ -39,7 +39,6 @@ stages:
         --model ${item}
         --train data/dataset/train.csv
         --model-out models/${item}.joblib
-        --metrics-out reports/metrics/${item}.json
         --label-col label
         --max-features 3000
         --cv-folds 5
@@ -50,6 +49,3 @@ stages:
         - src/modeling/phase_3_training.py
       outs:
         - models/${item}.joblib
-      metrics:
-        - reports/metrics/${item}.json:
-            cache: false

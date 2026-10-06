@@ -85,7 +85,6 @@ def main():
                         help="logreg | naive_bayes | linear_svm | random_forest")
     parser.add_argument("--train", required=True, help="CSV de train")
     parser.add_argument("--model-out", required=True, help="On guardar el model (.joblib)")
-    parser.add_argument("--metrics-out", required=True, help="On guardar les mètriques (.json)")
     parser.add_argument("--label-col", default="label")
     parser.add_argument("--max-features", type=int, default=3000)
     parser.add_argument("--cv-folds", type=int, default=5)
@@ -102,13 +101,12 @@ def main():
         random_state=args.random_state,
     )
     logger.info("Mètriques (validació creuada): %s", metrics)
-
-    for path in (args.model_out, args.metrics_out):
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+    absolute_parent = Path(args.model_out).resolve().parent
+    absolute_parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, args.model_out)
-    Path(args.metrics_out).write_text(json.dumps(metrics, indent=2))
-    logger.info("Guardat %s i %s", args.model_out, args.metrics_out)
-
+    logger.info("Guardat %s", args.model_out)
+    
+    
 
 if __name__ == "__main__":
     main()
