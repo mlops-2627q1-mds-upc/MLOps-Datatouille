@@ -96,7 +96,6 @@ Our repository is configured to strictly enforce **Squash and Merge**.
 
 Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 
-* Use 4 spaces per indent level. Do not use tabs.
 * Keep lines short (max 127 chars to pass CI, aim for ~99).
 * Use blank lines to separate logic:
     * 2 blank lines around top-level functions and classes.
