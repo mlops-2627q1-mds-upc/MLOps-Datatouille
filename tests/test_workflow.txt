@@ -1,0 +1,3 @@
+Temporal txt file to test complete workflow:
+    1. Test merge from task branch into dev and the execution of the unit tests suite of the Github workflow
+    2. Test merge from dev into main
