@@ -52,9 +52,13 @@ stages:
   train@logreg:
     cmd: python -m src.modeling.phase_3_training --model logreg --train 
       data/dataset/train.csv --model-out models/logreg.joblib --metrics-out 
-      metrics/logreg.json --label-col label --max-features 3000 --cv-folds 5 
-      --random-state 42
+      reports/metrics/logreg.json --label-col label --max-features 3000 
+      --cv-folds 5 --random-state 42
     deps:
+    - path: data/dataset/test.csv
+      hash: md5
+      md5: 5d8206e447a493f56698a36814d2080f
+      size: 982635
     - path: data/dataset/train.csv
       hash: md5
       md5: 440be6a01ef0e722d48de330f3692cb5
@@ -64,20 +68,24 @@ stages:
       md5: 8ecd7fef49d9bbea20628e7481635f7a
       size: 4671
     outs:
-    - path: metrics/logreg.json
+    - path: models/logreg.joblib
+      hash: md5
+      md5: 8522ebe8a75fd18270ba8e461836f926
+      size: 134529
+    - path: reports/metrics/logreg.json
       hash: md5
       md5: b289323b98de5615170731d6ef7bd957
       size: 142
-    - path: models/logreg.joblib
-      hash: md5
-      md5: 16fa5272c7e81a263886d06ad061836b
-      size: 134529
   train@naive_bayes:
     cmd: python -m src.modeling.phase_3_training --model naive_bayes --train 
       data/dataset/train.csv --model-out models/naive_bayes.joblib --metrics-out
-      metrics/naive_bayes.json --label-col label --max-features 3000 --cv-folds 
-      5 --random-state 42
+      reports/metrics/naive_bayes.json --label-col label --max-features 3000 
+      --cv-folds 5 --random-state 42
     deps:
+    - path: data/dataset/test.csv
+      hash: md5
+      md5: 5d8206e447a493f56698a36814d2080f
+      size: 982635
     - path: data/dataset/train.csv
       hash: md5
       md5: 440be6a01ef0e722d48de330f3692cb5
@@ -87,20 +95,24 @@ stages:
       md5: 8ecd7fef49d9bbea20628e7481635f7a
       size: 4671
     outs:
-    - path: metrics/naive_bayes.json
+    - path: models/naive_bayes.joblib
+      hash: md5
+      md5: 048bb756b2a529be50427a022ab8f436
+      size: 206569
+    - path: reports/metrics/naive_bayes.json
       hash: md5
       md5: a79332e6bde81a480b87bb9f6ae9c988
       size: 142
-    - path: models/naive_bayes.joblib
-      hash: md5
-      md5: d9ad2f97bb78ea1ae958537a5e666776
-      size: 206569
   train@linear_svm:
     cmd: python -m src.modeling.phase_3_training --model linear_svm --train 
       data/dataset/train.csv --model-out models/linear_svm.joblib --metrics-out 
-      metrics/linear_svm.json --label-col label --max-features 3000 --cv-folds 5
-      --random-state 42
+      reports/metrics/linear_svm.json --label-col label --max-features 3000 
+      --cv-folds 5 --random-state 42
     deps:
+    - path: data/dataset/test.csv
+      hash: md5
+      md5: 5d8206e447a493f56698a36814d2080f
+      size: 982635
     - path: data/dataset/train.csv
       hash: md5
       md5: 440be6a01ef0e722d48de330f3692cb5
@@ -110,20 +122,24 @@ stages:
       md5: 8ecd7fef49d9bbea20628e7481635f7a
       size: 4671
     outs:
-    - path: metrics/linear_svm.json
+    - path: models/linear_svm.joblib
+      hash: md5
+      md5: 6b86b8c36f0096a6716e94b37464a940
+      size: 134413
+    - path: reports/metrics/linear_svm.json
       hash: md5
       md5: de0916a2999ecc353d253185e491c912
       size: 142
-    - path: models/linear_svm.joblib
-      hash: md5
-      md5: 8d479b165644a3ca72178f5e99cd8248
-      size: 134413
   train@random_forest:
     cmd: python -m src.modeling.phase_3_training --model random_forest --train 
       data/dataset/train.csv --model-out models/random_forest.joblib 
-      --metrics-out metrics/random_forest.json --label-col label --max-features 
-      3000 --cv-folds 5 --random-state 42
+      --metrics-out reports/metrics/random_forest.json --label-col label 
+      --max-features 3000 --cv-folds 5 --random-state 42
     deps:
+    - path: data/dataset/test.csv
+      hash: md5
+      md5: 5d8206e447a493f56698a36814d2080f
+      size: 982635
     - path: data/dataset/train.csv
       hash: md5
       md5: 440be6a01ef0e722d48de330f3692cb5
@@ -133,11 +149,11 @@ stages:
       md5: 8ecd7fef49d9bbea20628e7481635f7a
       size: 4671
     outs:
-    - path: metrics/random_forest.json
+    - path: models/random_forest.joblib
+      hash: md5
+      md5: a4af9ef8216cd5bed5c00604a4807117
+      size: 20403602
+    - path: reports/metrics/random_forest.json
       hash: md5
       md5: ef9f0b69da6077ab2e03249fe7f3d3af
       size: 142
-    - path: models/random_forest.joblib
-      hash: md5
-      md5: ee0b057e26eaba5b718287c2f43946c1
-      size: 20403602

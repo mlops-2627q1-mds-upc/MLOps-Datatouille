@@ -2,34 +2,34 @@ stages:
   preprocess:
     cmd: >-
       python -m src.data_preparation.phase_1_cleaning
-      --input ${data.raw}
-      --output ${data.clean}
-      --text-col ${data.text_col}
-      --label-col ${data.label_col}
-      --encoding ${data.encoding}
+      --input data/raw/daisy_dataset_spam_detection.csv
+      --output data/processed/clean.csv
+      --text-col text
+      --label-col label
+      --encoding utf-8
     deps:
-      - ${data.raw}
+      - data/raw/daisy_dataset_spam_detection.csv
       - src/data_preparation/preprocess.py
       - src/data_preparation/phase_1_cleaning.py
     outs:
-      - ${data.clean}
+      - data/processed/clean.csv
 
   split:
     cmd: >-
       python -m src.data_preparation.phase_2_splitting
-      --input ${data.clean}
-      --train ${split.train}
-      --test ${split.test}
-      --label-col ${data.label_col}
-      --test-size ${split.test_size}
-      --random-state ${split.random_state}
+      --input data/processed/clean.csv
+      --train data/dataset/train.csv
+      --test data/dataset/test.csv
+      --label-col label
+      --test-size 0.2
+      --random-state 42
     deps:
-      - ${data.clean}
+      - data/processed/clean.csv
       - src/data_preparation/preprocess.py
       - src/data_preparation/phase_2_splitting.py
     outs:
-      - ${split.train}
-      - ${split.test}
+      - data/dataset/train.csv
+      - data/dataset/test.csv
 
   train:
     foreach: ${train.models}
@@ -37,15 +37,16 @@ stages:
       cmd: >-
         python -m src.modeling.phase_3_training
         --model ${item}
-        --train ${split.train}
+        --train data/dataset/train.csv
         --model-out models/${item}.joblib
         --metrics-out reports/metrics/${item}.json
-        --label-col ${data.label_col}
-        --max-features ${train.max_features}
-        --cv-folds ${train.cv_folds}
-        --random-state ${train.random_state}
+        --label-col label
+        --max-features 3000
+        --cv-folds 5
+        --random-state 42
       deps:
-        - ${split.train}
+        - data/dataset/train.csv
+        - data/dataset/test.csv
         - src/modeling/phase_3_training.py
       outs:
         - models/${item}.joblib
