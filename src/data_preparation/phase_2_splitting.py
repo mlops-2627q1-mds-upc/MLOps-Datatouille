@@ -1,8 +1,8 @@
-"""Etapa 2 de la pipeline: dataset preprocessat -> train / test.
+"""Phase 2 of the pipeline: processed dataset -> train / test.
 
-El split és estratificat per l'etiqueta i reproduïble (random_state).
+The split is stratified by the label and reproducible (random_state).
 
-Ús (des de l'arrel del projecte):
+Usage (from the root of the repo):
     python -m src.split_dataset --input data/processed/clean.csv \
         --train data/processed/train.csv --test data/processed/test.csv
 """
@@ -21,15 +21,15 @@ logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(description="Train / test split.")
-    parser.add_argument("--input", required=True, help="CSV preprocessat")
-    parser.add_argument("--train", required=True, help="CSV de train de sortida")
-    parser.add_argument("--test", required=True, help="CSV de test de sortida")
+    parser.add_argument("--input", required=True, help="Preprocessed CSV")
+    parser.add_argument("--train", required=True, help="Output train CSV")
+    parser.add_argument("--test", required=True, help="Output test CSV")
     parser.add_argument("--label-col", default="label")
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
     args = parser.parse_args()
 
-    logger.info("Llegint %s", args.input)
+    logger.info("Reading %s", args.input)
     df = pd.read_csv(args.input)
 
     train_df, test_df = pp.split_data(df, args.label_col, args.test_size, args.random_state)
@@ -38,7 +38,7 @@ def main():
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         split.to_csv(path, index=False)
-        logger.info("Guardat %s %s", path, split.shape)
+        logger.info("Saved %s %s", path, split.shape)
 
 
 if __name__ == "__main__":

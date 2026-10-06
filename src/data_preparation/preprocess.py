@@ -41,52 +41,52 @@ def _is_punctuation(char):
 
 
 def remove_punctuation(text):
-    """Elimina los signos de puntuación del texto, conservando los emojis."""
+    """Delete the signos de puntuación del texto, conservando los emojis."""
     return "".join(ch for ch in text if not _is_punctuation(ch))
 
 
 def remove_numbers(text):
-    """Elimina los dígitos numéricos del texto."""
+    """Delete the numeric digits from the text."""
     return re.sub(r"\d+", "", text)
 
 
 def remove_whitespace(text):
-    """Elimina espacios al inicio/final y reduce múltiples espacios a uno."""
+    """Delete spaces at the beginning/end and reduce multiple spaces to one."""
     return re.sub(r"\s+", " ", text).strip()
 
 
 def remove_html(text):
-    """Elimina etiquetas HTML (como <p>, <br>, etc.)."""
+    """Delete HTML tags (like <p>, <br>, etc.)."""
     return re.sub(r"<[^>]+>", "", text)
 
 
 def replace_urls(text):
-    """Reemplaza enlaces web por el token estandarizado [URL]."""
+    """Replace web links with the standardized token [URL]."""
     return re.sub(URL_PATTERN, "[URL]", text)
 
 
 def replace_money(text):
-    """Reemplaza cifras de dinero (500$, 10.000 €, 50USD, $100) por [DINERO]."""
+    """Replace money amounts (500$, 10.000 €, 50USD, $100) with [DINERO]."""
     return re.sub(MONEY_PATTERN, "[DINERO]", text)
 
 
 def convert_emojis(text):
-    """Convierte emojis en texto descriptivo """
+    """Convert emojis to descriptive text """
     return emoji.demojize(text, delimiters=(" ", " "))
 
 
 def separate_emojis(text):
-    """Pone espacios alrededor de cada emoji para que sea un token propio."""
+    """Put espacios alrededor de cada emoji para que sea un token propio."""
     return emoji.replace_emoji(text, replace=lambda chars, data: f" {chars} ")
 
 
 def remove_stopwords(text, stopwords=ENGLISH_STOP_WORDS):
-    """Elimina las stop words (inglés por defecto). Espera texto en minúsculas."""
+    """Delete the stop words (English by default). Expects lowercase text."""
     return " ".join(word for word in text.split() if word not in stopwords)
 
 
 def stem_text(text):
-    """Aplica stemming (Porter) a cada palabra del texto."""
+    """Apply stemming (Porter) to each word in the text."""
     return " ".join(_stemmer.stem(word) for word in text.split())
 
 
@@ -95,37 +95,37 @@ def stem_text(text):
 # ---------------------------------------------------------------------------
 
 def count_characters(text):
-    """Número de caracteres."""
+    """Number of characters."""
     return len(text)
 
 
 def count_words(text):
-    """Número de palabras (separadas por espacios)."""
+    """Number of words (separated by spaces)."""
     return len(text.split())
 
 
 def count_sentences(text):
-    """Número de frases (separadas por '.', '!' o '?')."""
+    """Number of sentences (separated by '.', '!' or '?')."""
     return len([s for s in re.split(SENTENCE_END_PATTERN, text) if s.strip()])
 
 
 def count_uppercase(text):
-    """Número de letras mayúsculas."""
+    """Number of uppercase letters."""
     return sum(1 for ch in text if ch.isupper())
 
 
 def count_urls(text):
-    """Número de enlaces / urls."""
+    """Number of links / urls."""
     return len(re.findall(URL_PATTERN, text))
 
 
 def count_emojis(text):
-    """Número de emojis."""
+    """Number of emojis."""
     return emoji.emoji_count(text)
 
 
 def count_punctuation(text):
-    """Número de signos de puntuación (los emojis no cuentan)."""
+    """Number of punctuation marks (emojis are not counted)."""
     return sum(1 for ch in text if _is_punctuation(ch))
 
 
@@ -144,10 +144,10 @@ COUNT_FUNCTIONS = {
 # 3. Pipeline de limpieza completo
 # ---------------------------------------------------------------------------
 def clean_text(text, emojis_as_text=False):
-    """Aplica todas las transformaciones con pérdida de información.
+    """Apply all transformations with information loss.
 
-    Orden: html -> urls -> dinero -> emojis -> minúsculas -> puntuación ->
-    números -> stop words -> stemming -> espacios.
+    Order: html -> urls -> money -> emojis -> lowercase -> punctuation ->
+    numbers -> stop words -> stemming -> spaces.
 
     Args:
         text: texto original.
@@ -172,12 +172,12 @@ def clean_text(text, emojis_as_text=False):
 # ---------------------------------------------------------------------------
 
 def remove_duplicates(df, column):
-    """Elimina filas con el mismo valor en `column` (se queda la primera)."""
+    """Remove rows with the same value in `column` (keep the first)."""
     return df.drop_duplicates(subset=column, keep="first").reset_index(drop=True)
 
 
 def add_count_features(df, text_column):
-    """Añade una columna por cada conteo calculado sobre `text_column`."""
+    """Add a column for each count calculated over `text_column`."""
     df = df.copy()
     for name, func in COUNT_FUNCTIONS.items():
         df[name] = df[text_column].apply(func)
@@ -185,14 +185,14 @@ def add_count_features(df, text_column):
 
 
 def add_clean_text(df, text_column, output_column="clean_text", emojis_as_text=False):
-    """Añade la columna con el texto limpio."""
+    """Add the column with the cleaned text."""
     df = df.copy()
     df[output_column] = df[text_column].apply(clean_text, emojis_as_text=emojis_as_text)
     return df
 
 
 def split_data(df, label_column, test_size=0.2, random_state=42):
-    """Train/test split estratificado por la etiqueta."""
+    """Train/test split stratified by the label."""
     train_df, test_df = train_test_split(
         df,
         test_size=test_size,
@@ -203,9 +203,9 @@ def split_data(df, label_column, test_size=0.2, random_state=42):
 
 
 def fit_tfidf(texts, max_features=3000):
-    """Ajusta un TF-IDF sobre `texts` (solo train, para evitar data leakage).
-    Se usa token_pattern=r"\\S+" porque el texto ya está limpio: el patrón
-    por defecto de sklearn descartaría los emojis y palabras de 1 letra.
+    """Fit a TF-IDF over `texts` (only on train, to avoid data leakage).
+    The token_pattern=r"\\S+" is used because the text is already cleaned: the default pattern
+    from sklearn would discard emojis and words of 1 letter.
     """
     vectorizer = TfidfVectorizer(max_features=max_features, token_pattern=r"\S+")
     vectorizer.fit(texts)
@@ -213,7 +213,7 @@ def fit_tfidf(texts, max_features=3000):
 
 
 def transform_tfidf(vectorizer, texts, prefix="tfidf_"):
-    """Transforma `texts` a un DataFrame con una columna por término."""
+    """Transform `texts` into a DataFrame with a column per term."""
     matrix = vectorizer.transform(texts)
     columns = [f"{prefix}{term}" for term in vectorizer.get_feature_names_out()]
     return pd.DataFrame(matrix.toarray(), columns=columns)

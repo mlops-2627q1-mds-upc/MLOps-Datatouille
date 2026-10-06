@@ -23,7 +23,7 @@ SCORING = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 
 
 def get_classifier(name, random_state=42):
-    """Retorna el classificador corresponent a `name`."""
+    """Returns the classifier corresponding to `name`."""
     classifiers = {
         "logreg": LogisticRegression(max_iter=1000, class_weight="balanced", random_state=random_state),
         "naive_bayes": MultinomialNB(),
@@ -37,12 +37,12 @@ def get_classifier(name, random_state=42):
 
 
 def get_count_columns(df):
-    """Columnes de comptatges generades a la fase 1 (n_words, n_emojis...)."""
+    """Returns the count columns generated in phase 1 (n_words, n_emojis...)."""
     return [col for col in df.columns if col.startswith("n_")]
 
 
 def build_pipeline(model_name, count_columns, max_features=3000, random_state=42):
-    """Construeix el Pipeline complet: features + classificador."""
+    """Builds the complete Pipeline: features + classifier."""
     features = ColumnTransformer(
         [
             # token_pattern=r"\S+" perquè el text ja està net i així no es perden els emojis
@@ -57,9 +57,8 @@ def build_pipeline(model_name, count_columns, max_features=3000, random_state=42
         ]
     )
 
-
 def load_xy(path, label_col):
-    """Llegeix un CSV de train/test i el separa en X i y."""
+    """Loads a CSV file and separates it into features (X) and target (y)."""
     df = pd.read_csv(path)
     df[TEXT_COL] = df[TEXT_COL].fillna("").astype(str)
     count_columns = get_count_columns(df)
@@ -67,7 +66,7 @@ def load_xy(path, label_col):
 
 
 def train_and_evaluate(model_name, X, y, count_columns, max_features=3000, cv_folds=5, random_state=42):
-    """Validació creuada sobre train i entrenament final amb tot el train."""
+    """Performs cross-validation on train data and final training with all train data."""
     pipeline = build_pipeline(model_name, count_columns, max_features, random_state)
 
     cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=random_state)

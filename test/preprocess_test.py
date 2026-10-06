@@ -1,6 +1,6 @@
-"""Tests unitarios de src/data_preparation/preprocess.py.
-
-Ejecutar desde la raíz del proyecto:
+"""
+Unit test of the src/data_preparation/preprocess.py module.
+Execute from the root of the project:
     pytest -v
 """
 
@@ -10,9 +10,6 @@ import pytest
 from src.data_preparation import preprocess as pp
 
 
-# ---------------------------------------------------------------------------
-# Limpieza de texto
-# ---------------------------------------------------------------------------
 def test_lower_case():
     assert pp.lower_case("CLAIM Your PRIZE") == "claim your prize"
 
@@ -78,8 +75,8 @@ def test_replace_urls(text, expected):
         ("only 10.000 € today", "only [DINERO] today"),
         ("get 50USD free", "get [DINERO] free"),
         ("pay EUR 20,50 please", "pay [DINERO] please"),
-        ("call 0800 123", "call 0800 123"),  # números sin moneda no se tocan
-        ("EUROPE 2024", "EUROPE 2024"),  # 'EUR' dentro de una palabra no cuenta
+        ("call 0800 123", "call 0800 123"),
+        ("EUROPE 2024", "EUROPE 2024"),
     ],
 )
 def test_replace_money(text, expected):
@@ -108,9 +105,6 @@ def test_stem_text():
     assert pp.stem_text("running cats playing") == "run cat play"
 
 
-# ---------------------------------------------------------------------------
-# Conteos
-# ---------------------------------------------------------------------------
 def test_count_characters():
     assert pp.count_characters("hola!") == 5
     assert pp.count_characters("") == 0
@@ -156,9 +150,6 @@ def test_count_punctuation_ignores_emojis():
     assert pp.count_punctuation("🎉🎉") == 0
 
 
-# ---------------------------------------------------------------------------
-# Pipeline completo
-# ---------------------------------------------------------------------------
 def test_clean_text_keeps_emojis():
     result = pp.clean_text("WINNER!!! Claim your prize 🎉 at http://spam.com")
     assert result == "winner claim prize 🎉 url"
@@ -178,9 +169,6 @@ def test_clean_text_makes_near_duplicates_equal():
     assert pp.clean_text("FREE prize!!!") == pp.clean_text("free prize")
 
 
-# ---------------------------------------------------------------------------
-# Funciones sobre DataFrames
-# ---------------------------------------------------------------------------
 @pytest.fixture
 def sample_df():
     return pd.DataFrame(
@@ -215,7 +203,7 @@ def test_add_count_features(sample_df):
         assert col in result.columns
     assert result.loc[0, "n_emojis"] == 1
     assert result.loc[0, "n_urls"] == 1
-    assert "n_words" not in sample_df.columns  # no modifica el original
+    assert "n_words" not in sample_df.columns
 
 
 def test_add_clean_text_and_second_dedup(sample_df):
@@ -223,7 +211,6 @@ def test_add_clean_text_and_second_dedup(sample_df):
     df = pp.add_clean_text(df, "text")
     assert "clean_text" in df.columns
     deduped = pp.remove_duplicates(df, "clean_text")
-    # 'WIN a FREE prize!!!...' y 'win a free prize...' quedan iguales tras limpiar
     assert len(deduped) == len(df) - 1
 
 
@@ -231,7 +218,7 @@ def test_split_data(sample_df):
     train, test = pp.split_data(sample_df, "label", test_size=0.2, random_state=0)
     assert len(train) + len(test) == len(sample_df)
     assert len(test) == 2
-    assert set(test["label"]) == {"spam", "ham"}  # estratificado
+    assert set(test["label"]) == {"spam", "ham"}
 
 
 def test_split_data_is_reproducible(sample_df):
