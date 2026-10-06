@@ -153,8 +153,7 @@ Users should be made aware of the risks, biases, and limitations of the dataset.
 
 ## Citation
 
-**BibTeX:**
-
+```bibtex
 @misc{email_classification_2026,
   author    = {Aguilera, Carles and Bueno, Alex and Delgado, Joel and Torrents, Berta and Velilla, Diego},
   title     = {Email Classification Dataset},
@@ -162,6 +161,7 @@ Users should be made aware of the risks, biases, and limitations of the dataset.
   publisher = {Hugging Face},
   url       = {https://huggingface.co/datasets/diegovelilla/email-classification-dataset}
 }
+```
 
 **APA:**
 
