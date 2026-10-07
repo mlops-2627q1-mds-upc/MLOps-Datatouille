@@ -7,7 +7,7 @@ Steps:
     4. Remove duplicates on the cleaned text.
 
 Usage (from the root of the repo):
-    python -m src.data_preparation.phase_1_cleaning \
+    python -m src.data.phase_1_cleaning \
         --input data/raw/daisy_dataset_spam_detection.csv --output data/processed/clean.csv
 """
 
@@ -15,7 +15,7 @@ import argparse
 import logging
 from pathlib import Path
 import pandas as pd
-from src.data_preparation import preprocess as pp
+from src.data import preprocess as pp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -50,12 +50,7 @@ def main():
     parser.add_argument("--text-col", default="text")
     parser.add_argument("--label-col", default="label")
     parser.add_argument("--encoding", default="utf-8")
-    parser.add_argument(
-        "--emojis-as-text",
-        type=lambda s: s.lower() == "true",
-        default=False,
-        help="Convert emojis to words instead of keeping them (true/false)",
-    )
+    parser.add_argument("--emojis-as-text", type=lambda s: s.lower() == "true", default=False, help="Convert emojis to words instead of keeping them (true/false)",)
     args = parser.parse_args()
 
     logger.info("Reading %s", args.input)

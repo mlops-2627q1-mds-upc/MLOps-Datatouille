@@ -1,0 +1,22 @@
+{
+  "data": {
+    "asset": {
+      "id": "e11ea50e-67ca-4cb1-9bf7-633a6ab59015",
+      "name": "spam_dataset"
+    },
+    "batch_definition": {
+      "id": "f11e86b5-da0a-4b7c-a862-0fec7b9401cc",
+      "name": "full_csv"
+    },
+    "datasource": {
+      "id": "db249a91-6b05-4685-8f63-e53eb76d8903",
+      "name": "raw_data"
+    }
+  },
+  "id": "00ca431a-8d34-4fee-9a80-fd43cdf9ec64",
+  "name": "raw_spam_dataset_validation",
+  "suite": {
+    "id": "dc26b41a-3626-4a65-996e-53028a4104fe",
+    "name": "raw_spam_dataset_suite"
+  }
+}

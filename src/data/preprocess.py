@@ -4,7 +4,6 @@ import unicodedata
 import emoji                            # pip install emoji
 from nltk.stem import PorterStemmer     # pip install nltk
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
-from sklearn.model_selection import train_test_split
 
 
 # ---------------------------------------------------------------------------
@@ -188,17 +187,6 @@ def add_clean_text(df, text_column, output_column="clean_text", emojis_as_text=F
     df = df.copy()
     df[output_column] = df[text_column].apply(clean_text, emojis_as_text=emojis_as_text)
     return df
-
-
-def split_data(df, label_column, test_size=0.2, random_state=42):
-    """Train/test split stratified by the label."""
-    train_df, test_df = train_test_split(
-        df,
-        test_size=test_size,
-        random_state=random_state,
-        stratify=df[label_column],
-    )
-    return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
 
 
 def make_tfidf(max_features=3000):

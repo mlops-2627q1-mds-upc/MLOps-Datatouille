@@ -1,0 +1,95 @@
+{
+  "expectations": [
+    {
+      "id": "6efba92d-2e45-4bc2-a53d-4c5f152711c8",
+      "kwargs": {
+        "column_list": [
+          "text",
+          "label"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_table_columns_to_match_ordered_list"
+    },
+    {
+      "id": "6fef7803-a54f-4c0b-945e-b1988c0c7447",
+      "kwargs": {
+        "min_value": 1000
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_table_row_count_to_be_between"
+    },
+    {
+      "id": "d75e2ca6-1f17-4f1e-a029-7e4bd7d2cb3a",
+      "kwargs": {
+        "column": "text"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "5d19f876-f362-4d8e-a651-0017b1a9dee0",
+      "kwargs": {
+        "column": "text",
+        "type_": "str"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "b57d538e-63e6-4826-890c-d0e6c51b04a9",
+      "kwargs": {
+        "column": "text",
+        "min_value": 1
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_value_lengths_to_be_between"
+    },
+    {
+      "id": "417b1128-6daf-4fcf-a472-07375f2ec0d7",
+      "kwargs": {
+        "column": "label"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "fe4a5d47-42bd-48ce-ac15-61428d2d16b8",
+      "kwargs": {
+        "column": "label",
+        "value_set": [
+          "spam",
+          "not_spam"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "019aac01-f524-4c9f-aa3d-ab84d2e3d66d",
+      "kwargs": {
+        "column": "label",
+        "value_set": [
+          "spam",
+          "not_spam"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_distinct_values_to_equal_set"
+    }
+  ],
+  "id": "dc26b41a-3626-4a65-996e-53028a4104fe",
+  "meta": {
+    "great_expectations_version": "1.23.2"
+  },
+  "name": "raw_spam_dataset_suite",
+  "notes": null
+}

@@ -1,6 +1,7 @@
-dvc==3.67.1
 dvc-s3==3.3.0
+dvc==3.67.1
 emoji==2.16.0
+great_expectations==1.23.2
 joblib==1.5.2
 nltk==3.9.2
 pandas==2.3.3

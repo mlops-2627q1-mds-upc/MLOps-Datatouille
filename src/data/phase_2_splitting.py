@@ -3,17 +3,15 @@
 The split is stratified by the label and reproducible (random_state).
 
 Usage (from the root of the repo):
-    python -m src.data_preparation.phase_2_splitting --input data/processed/clean.csv \
+    python -m src.data.phase_2_splitting --input data/processed/clean.csv \
         --train data/dataset/train.csv --test data/dataset/test.csv
 """
 
 import argparse
 import logging
 from pathlib import Path
-
 import pandas as pd
-
-from src.data_preparation import preprocess as pp
+from src.data.split_data import split_data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -31,9 +29,7 @@ def main():
 
     logger.info("Reading %s", args.input)
     df = pd.read_csv(args.input)
-
-    train_df, test_df = pp.split_data(df, args.label_col, args.test_size, args.random_state)
-
+    train_df, test_df = split_data(df, args.label_col, args.test_size, args.random_state)
     for path, split in ((args.train, train_df), (args.test, test_df)):
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)

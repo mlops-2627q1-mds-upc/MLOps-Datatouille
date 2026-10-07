@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 # Data is versioned with DVC (see *.dvc and dvc.lock), never with Git
-data/
+/data/
 
 # C extensions
 *.so

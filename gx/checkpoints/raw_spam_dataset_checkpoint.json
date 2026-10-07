@@ -1,0 +1,18 @@
+{
+  "actions": [
+    {
+      "name": "update_data_docs",
+      "site_names": [],
+      "type": "update_data_docs"
+    }
+  ],
+  "id": "c95a8f84-2c18-4945-81e1-dd9f48481577",
+  "name": "raw_spam_dataset_checkpoint",
+  "result_format": "SUMMARY",
+  "validation_definitions": [
+    {
+      "id": "00ca431a-8d34-4fee-9a80-fd43cdf9ec64",
+      "name": "raw_spam_dataset_validation"
+    }
+  ]
+}

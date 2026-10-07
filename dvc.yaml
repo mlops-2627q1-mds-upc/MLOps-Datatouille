@@ -1,7 +1,7 @@
 stages:
   clean:
     cmd: >-
-      python -m src.data_preparation.phase_1_cleaning
+      python -m src.data.phase_1_cleaning
       --input ${data.raw}
       --output ${data.clean}
       --text-col ${data.text_col}
@@ -10,8 +10,8 @@ stages:
       --emojis-as-text ${data.emojis_as_text}
     deps:
       - ${data.raw}
-      - src/data_preparation/preprocess.py
-      - src/data_preparation/phase_1_cleaning.py
+      - src/data/preprocess.py
+      - src/data/phase_1_cleaning.py
     params:
       - data
     outs:
@@ -19,7 +19,7 @@ stages:
 
   split:
     cmd: >-
-      python -m src.data_preparation.phase_2_splitting
+      python -m src.data.phase_2_splitting
       --input ${data.clean}
       --train ${split.train}
       --test ${split.test}
@@ -28,8 +28,8 @@ stages:
       --random-state ${split.random_state}
     deps:
       - ${data.clean}
-      - src/data_preparation/preprocess.py
-      - src/data_preparation/phase_2_splitting.py
+      - src/data/split_data.py
+      - src/data/phase_2_splitting.py
     params:
       - split
       - data.label_col
@@ -51,7 +51,7 @@ stages:
         --random-state ${train.random_state}
       deps:
         - ${split.train}
-        - src/data_preparation/preprocess.py
+        - src/data/preprocess.py
         - src/modeling/phase_3_training.py
       params:
         - data.label_col

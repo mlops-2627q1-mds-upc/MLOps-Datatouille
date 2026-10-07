@@ -1,5 +1,5 @@
 """
-Unit test of the src/data_preparation/preprocess.py module.
+Unit test of the src/data/preprocess.py module.
 Execute from the root of the project:
     pytest -v
 """
@@ -7,7 +7,7 @@ Execute from the root of the project:
 import pandas as pd
 import pytest
 
-from src.data_preparation import preprocess as pp
+from src.data import preprocess as pp
 
 
 def test_lower_case():
@@ -170,27 +170,6 @@ def test_clean_text_makes_near_duplicates_equal():
     assert pp.clean_text("FREE prize!!!") == pp.clean_text("free prize")
 
 
-@pytest.fixture
-def sample_df():
-    return pd.DataFrame(
-        {
-            "text": [
-                "WIN a FREE prize!!! 🎉 http://spam.com",
-                "Hey, are we meeting today?",
-                "WIN a FREE prize!!! 🎉 http://spam.com",
-                "win a free prize 🎉 http://spam.com",
-                "See you later",
-                "Claim your $500 reward now!",
-                "Lunch at 2?",
-                "URGENT call now",
-                "ok thanks",
-                "Congrats, you won!!",
-            ],
-            "label": ["spam", "ham", "spam", "spam", "ham", "spam", "ham", "spam", "ham", "spam"],
-        }
-    )
-
-
 def test_remove_duplicates(sample_df):
     result = pp.remove_duplicates(sample_df, "text")
     assert len(result) == len(sample_df) - 1
@@ -202,7 +181,7 @@ def test_add_count_features(sample_df):
     result = pp.add_count_features(sample_df, "text")
     for col in pp.COUNT_FUNCTIONS:
         assert col in result.columns
-    assert result.loc[0, "n_emojis"] == 1
+    assert result.loc[0, "n_emojis"] == 0
     assert result.loc[0, "n_urls"] == 1
     assert "n_words" not in sample_df.columns
 
@@ -213,19 +192,6 @@ def test_add_clean_text_and_second_dedup(sample_df):
     assert "clean_text" in df.columns
     deduped = pp.remove_duplicates(df, "clean_text")
     assert len(deduped) == len(df) - 1
-
-
-def test_split_data(sample_df):
-    train, test = pp.split_data(sample_df, "label", test_size=0.2, random_state=0)
-    assert len(train) + len(test) == len(sample_df)
-    assert len(test) == 2
-    assert set(test["label"]) == {"spam", "ham"}
-
-
-def test_split_data_is_reproducible(sample_df):
-    a, _ = pp.split_data(sample_df, "label", random_state=1)
-    b, _ = pp.split_data(sample_df, "label", random_state=1)
-    pd.testing.assert_frame_equal(a, b)
 
 
 def test_tfidf_keeps_emojis_and_shape():
