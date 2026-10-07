@@ -97,8 +97,8 @@ Our repository is configured to strictly enforce **Squash and Merge**.
 * Ensure the final squashed commit message adheres to the 7 Git commit rules, summarizing the entire PR.
 * Delete the feature branch after merging to keep the repository clean:
     ```bash
-    git checkout main
-    git pull origin main
+    git checkout dev
+    git pull origin dev
     git branch -d <branch-name>
     git push origin --delete <branch-name>
     ```
@@ -107,7 +107,7 @@ Our repository is configured to strictly enforce **Squash and Merge**.
 
 ## 3. Release & Pre-Production Promotion (`dev` $\rightarrow$ `main`)
 When a sprint milestone is complete and integrated within dev, code is promoted to main for release and production serving.
-1. Open a Pull Request configuring: `base: main` $\$leftarrow `compare: dev`
+1. Open a Pull Request configuring: `base: main` $\leftarrow$ `compare: dev`
 2. **Automated CI Gate (`main`)**: GitHub Actions triggers the Comprehensive Pre-Production Validation job:
    - Source Verification: Fails immediately if the PR originates from any branch other than `dev`.
    - Full Data Pipeline Validation: Executes complete Great Expectations suites against the full dataset to prevent the data from schema corruption.
