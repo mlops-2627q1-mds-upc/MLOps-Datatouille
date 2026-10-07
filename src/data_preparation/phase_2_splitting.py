@@ -1,10 +1,10 @@
-"""Phase 2 of the pipeline: processed dataset -> train / test.
+"""Phase 2 of the pipeline: cleaned dataset -> train / test.
 
 The split is stratified by the label and reproducible (random_state).
 
 Usage (from the root of the repo):
-    python -m src.split_dataset --input data/processed/clean.csv \
-        --train data/processed/train.csv --test data/processed/test.csv
+    python -m src.data_preparation.phase_2_splitting --input data/processed/clean.csv \
+        --train data/dataset/train.csv --test data/dataset/test.csv
 """
 
 import argparse

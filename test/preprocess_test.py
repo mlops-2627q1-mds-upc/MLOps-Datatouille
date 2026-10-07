@@ -14,15 +14,11 @@ def test_lower_case():
     assert pp.lower_case("CLAIM Your PRIZE") == "claim your prize"
 
 
-def test_upper_case():
-    assert pp.upper_case("claim prize") == "CLAIM PRIZE"
-
-
 @pytest.mark.parametrize(
     "text, expected",
     [
         ("Hello, world!!!", "Hello world"),
-        ("¿Qué tal? ¡Bien!", "Qué tal Bien"),
+        ("¿How are you? ¡Fine!", "How are you Fine"),
         ("no punctuation", "no punctuation"),
         ("", ""),
     ],
@@ -42,7 +38,7 @@ def test_remove_numbers():
 @pytest.mark.parametrize(
     "text, expected",
     [
-        ("  hola   que   tal  ", "hola que tal"),
+        ("  how   are   you  ", "how are you"),
         ("a\t\tb\n\nc", "a b c"),
         ("   ", ""),
     ],
@@ -52,35 +48,35 @@ def test_remove_whitespace(text, expected):
 
 
 def test_remove_html():
-    assert pp.remove_html("<p>Hola <b>mundo</b></p><br/>") == "Hola mundo"
+    assert pp.remove_html("<p>Hello <b>world</b></p><br/>") == "Hello world"
 
 
 @pytest.mark.parametrize(
     "text, expected",
     [
-        ("visit http://spam.com now", "visit [URL] now"),
-        ("go to https://a.b/c?d=1 and www.test.org", "go to [URL] and [URL]"),
+        ("visit http://spam.com now", "visit xxurl now"),
+        ("go to https://a.b/c?d=1 and www.test.org", "go to xxurl and xxurl"),
         ("no links here", "no links here"),
     ],
 )
 def test_replace_urls(text, expected):
-    assert pp.replace_urls(text) == expected
+    assert pp.remove_whitespace(pp.replace_urls(text)) == expected
 
 
 @pytest.mark.parametrize(
     "text, expected",
     [
-        ("win 500$ now", "win [DINERO] now"),
-        ("win $100 now", "win [DINERO] now"),
-        ("only 10.000 € today", "only [DINERO] today"),
-        ("get 50USD free", "get [DINERO] free"),
-        ("pay EUR 20,50 please", "pay [DINERO] please"),
+        ("win 500$ now", "win xxmoney now"),
+        ("win $100 now", "win xxmoney now"),
+        ("only 10.000 € today", "only xxmoney today"),
+        ("get 50USD free", "get xxmoney free"),
+        ("pay EUR 20,50 please", "pay xxmoney please"),
         ("call 0800 123", "call 0800 123"),
         ("EUROPE 2024", "EUROPE 2024"),
     ],
 )
 def test_replace_money(text, expected):
-    assert pp.replace_money(text) == expected
+    assert pp.remove_whitespace(pp.replace_money(text)) == expected
 
 
 def test_convert_emojis():
@@ -90,7 +86,7 @@ def test_convert_emojis():
 
 
 def test_separate_emojis():
-    assert pp.remove_whitespace(pp.separate_emojis("hola😀😀")) == "hola 😀 😀"
+    assert pp.remove_whitespace(pp.separate_emojis("hello😀😀")) == "hello 😀 😀"
 
 
 def test_remove_stopwords():
@@ -98,15 +94,19 @@ def test_remove_stopwords():
 
 
 def test_remove_stopwords_custom_list():
-    assert pp.remove_stopwords("hola que tal", stopwords={"que"}) == "hola tal"
+    assert pp.remove_stopwords("hello there friend", stopwords={"there"}) == "hello friend"
 
 
 def test_stem_text():
     assert pp.stem_text("running cats playing") == "run cat play"
 
 
+def test_stem_text_keeps_special_tokens():
+    assert pp.stem_text("xxurl xxmoney running") == "xxurl xxmoney run"
+
+
 def test_count_characters():
-    assert pp.count_characters("hola!") == 5
+    assert pp.count_characters("hello!") == 6
     assert pp.count_characters("") == 0
 
 
@@ -152,17 +152,18 @@ def test_count_punctuation_ignores_emojis():
 
 def test_clean_text_keeps_emojis():
     result = pp.clean_text("WINNER!!! Claim your prize 🎉 at http://spam.com")
-    assert result == "winner claim prize 🎉 url"
+    assert result == "winner claim prize 🎉 xxurl"
 
 
 def test_clean_text_emojis_as_text():
-    result = pp.clean_text("Party 🎉", emojis_as_text=True)
+    result = pp.clean_text("🎉", emojis_as_text=True)
     assert "🎉" not in result
-    assert result.startswith("parti")
+    assert "popper" in result
+    assert "partypopp" not in result
 
 
 def test_clean_text_money():
-    assert pp.clean_text("You won $1000!") == "won dinero"
+    assert pp.clean_text("You won $1000!") == "won xxmoney"
 
 
 def test_clean_text_makes_near_duplicates_equal():
@@ -229,21 +230,17 @@ def test_split_data_is_reproducible(sample_df):
 
 def test_tfidf_keeps_emojis_and_shape():
     texts = pd.Series(["win prize 🎉", "hello friend", "win 🎉 🎉"])
-    vec = pp.fit_tfidf(texts, max_features=10)
+    vec = pp.make_tfidf(max_features=10).fit(texts)
     assert "🎉" in vec.get_feature_names_out()
-
-    features = pp.transform_tfidf(vec, texts)
-    assert features.shape == (3, len(vec.get_feature_names_out()))
-    assert all(c.startswith("tfidf_") for c in features.columns)
+    assert vec.transform(texts).shape == (3, len(vec.get_feature_names_out()))
 
 
 def test_tfidf_max_features():
     texts = pd.Series(["a b c d e", "a b c", "a"])
-    vec = pp.fit_tfidf(texts, max_features=2)
+    vec = pp.make_tfidf(max_features=2).fit(texts)
     assert len(vec.get_feature_names_out()) == 2
 
 
 def test_tfidf_unknown_words_are_zero():
-    vec = pp.fit_tfidf(pd.Series(["win prize"]))
-    features = pp.transform_tfidf(vec, pd.Series(["totally new words"]))
-    assert features.to_numpy().sum() == 0
+    vec = pp.make_tfidf().fit(pd.Series(["win prize"]))
+    assert vec.transform(pd.Series(["totally new words"])).sum() == 0

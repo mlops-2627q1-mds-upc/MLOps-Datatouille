@@ -1,6 +1,8 @@
-pandas
-scikit-learn
-nltk
-emoji
-joblib
-pytest
+dvc==3.67.1
+dvc-s3==3.3.0
+emoji==2.16.0
+joblib==1.5.2
+nltk==3.9.2
+pandas==2.3.3
+pytest==8.4.2
+scikit-learn==1.7.2

@@ -2,11 +2,9 @@ import re
 import string
 import unicodedata
 import emoji                            # pip install emoji
-import pandas as pd
 from nltk.stem import PorterStemmer     # pip install nltk
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.model_selection import train_test_split
-
 
 
 # ---------------------------------------------------------------------------
@@ -20,6 +18,10 @@ MONEY_PATTERN = (
 )
 SENTENCE_END_PATTERN = r"[.!?]+"
 
+URL_TOKEN = "xxurl"
+MONEY_TOKEN = "xxmoney"
+SPECIAL_TOKENS = {URL_TOKEN, MONEY_TOKEN}
+
 _stemmer = PorterStemmer()
 
 # ---------------------------------------------------------------------------
@@ -30,18 +32,13 @@ def lower_case(text):
     return text.lower()
 
 
-def upper_case(text):
-    """Convert text into uppercase."""
-    return text.upper()
-
-
 def _is_punctuation(char):
     """True if the character is a punctuation mark (ASCII or Unicode)."""
     return char in string.punctuation or unicodedata.category(char).startswith("P")
 
 
 def remove_punctuation(text):
-    """Delete the signos de puntuación del texto, conservando los emojis."""
+    """Remove punctuation marks from the text, keeping emojis."""
     return "".join(ch for ch in text if not _is_punctuation(ch))
 
 
@@ -61,22 +58,24 @@ def remove_html(text):
 
 
 def replace_urls(text):
-    """Replace web links with the standardized token [URL]."""
-    return re.sub(URL_PATTERN, "[URL]", text)
+    """Replace web links with the placeholder token URL_TOKEN."""
+    return re.sub(URL_PATTERN, f" {URL_TOKEN} ", text)
 
 
 def replace_money(text):
-    """Replace money amounts (500$, 10.000 €, 50USD, $100) with [DINERO]."""
-    return re.sub(MONEY_PATTERN, "[DINERO]", text)
+    """Replace money amounts (500$, 10.000 €, 50USD, $100) with MONEY_TOKEN."""
+    return re.sub(MONEY_PATTERN, f" {MONEY_TOKEN} ", text)
 
 
 def convert_emojis(text):
-    """Convert emojis to descriptive text """
-    return emoji.demojize(text, delimiters=(" ", " "))
+    """Convert each emoji to its English name, with words separated by spaces."""
+    return emoji.replace_emoji(
+        text, replace=lambda chars, data: " " + data["en"].strip(":").replace("_", " ") + " "
+    )
 
 
 def separate_emojis(text):
-    """Put espacios alrededor de cada emoji para que sea un token propio."""
+    """Add spaces around each emoji so that it becomes its own token."""
     return emoji.replace_emoji(text, replace=lambda chars, data: f" {chars} ")
 
 
@@ -86,12 +85,12 @@ def remove_stopwords(text, stopwords=ENGLISH_STOP_WORDS):
 
 
 def stem_text(text):
-    """Apply stemming (Porter) to each word in the text."""
-    return " ".join(_stemmer.stem(word) for word in text.split())
+    """Apply Porter stemming to each word, leaving the special tokens untouched."""
+    return " ".join(w if w in SPECIAL_TOKENS else _stemmer.stem(w) for w in text.split())
 
 
 # ---------------------------------------------------------------------------
-# 2. Conteos sobre el texto original
+# 2. Counts on the original text
 # ---------------------------------------------------------------------------
 
 def count_characters(text):
@@ -141,7 +140,7 @@ COUNT_FUNCTIONS = {
 
 
 # ---------------------------------------------------------------------------
-# 3. Pipeline de limpieza completo
+# 3. Full cleaning pipeline
 # ---------------------------------------------------------------------------
 def clean_text(text, emojis_as_text=False):
     """Apply all transformations with information loss.
@@ -150,9 +149,9 @@ def clean_text(text, emojis_as_text=False):
     numbers -> stop words -> stemming -> spaces.
 
     Args:
-        text: texto original.
-        emojis_as_text: si True, convierte los emojis a palabras
-            (🚀 -> rocket); si False (defecto) se mantienen como emoji.
+        text: original text.
+        emojis_as_text: if True, emojis are converted to words (🚀 -> rocket);
+            if False (default), they are kept as emojis.
     """
     text = remove_html(text)
     text = replace_urls(text)
@@ -168,7 +167,7 @@ def clean_text(text, emojis_as_text=False):
 
 
 # ---------------------------------------------------------------------------
-# 4. Funciones sobre DataFrames
+# 4. DataFrame functions
 # ---------------------------------------------------------------------------
 
 def remove_duplicates(df, column):
@@ -202,18 +201,10 @@ def split_data(df, label_column, test_size=0.2, random_state=42):
     return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
 
 
-def fit_tfidf(texts, max_features=3000):
-    """Fit a TF-IDF over `texts` (only on train, to avoid data leakage).
-    The token_pattern=r"\\S+" is used because the text is already cleaned: the default pattern
-    from sklearn would discard emojis and words of 1 letter.
+def make_tfidf(max_features=3000):
+    """Return an unfitted TF-IDF vectorizer for already-cleaned text.
+
+    token_pattern=r"\\S+" is used because the default sklearn pattern would discard
+    emojis and one-letter words.
     """
-    vectorizer = TfidfVectorizer(max_features=max_features, token_pattern=r"\S+")
-    vectorizer.fit(texts)
-    return vectorizer
-
-
-def transform_tfidf(vectorizer, texts, prefix="tfidf_"):
-    """Transform `texts` into a DataFrame with a column per term."""
-    matrix = vectorizer.transform(texts)
-    columns = [f"{prefix}{term}" for term in vectorizer.get_feature_names_out()]
-    return pd.DataFrame(matrix.toarray(), columns=columns)
+    return TfidfVectorizer(max_features=max_features, token_pattern=r"\S+")

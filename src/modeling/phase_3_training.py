@@ -1,5 +1,10 @@
+"""Phase 3 of the pipeline: training of one classifier with cross-validation.
+
+Usage (from the root of the repo):
+    python -m src.modeling.phase_3_training --model logreg \
+        --train data/dataset/train.csv --model-out models/logreg.joblib
+"""
 import argparse
-import json
 import logging
 from pathlib import Path
 
@@ -7,13 +12,14 @@ import joblib
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import LinearSVC
+
+from src.data_preparation.preprocess import make_tfidf
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -32,7 +38,7 @@ def get_classifier(name, random_state=42):
                                                 random_state=random_state, n_jobs=-1),
     }
     if name not in classifiers:
-        raise ValueError(f"Model '{name}' desconegut. Opcions: {sorted(classifiers)}")
+        raise ValueError(f"Unknown model '{name}'. Options: {sorted(classifiers)}")
     return classifiers[name]
 
 
@@ -45,8 +51,7 @@ def build_pipeline(model_name, count_columns, max_features=3000, random_state=42
     """Builds the complete Pipeline: features + classifier."""
     features = ColumnTransformer(
         [
-            # token_pattern=r"\S+" perquè el text ja està net i així no es perden els emojis
-            ("tfidf", TfidfVectorizer(max_features=max_features, token_pattern=r"\S+"), TEXT_COL),
+            ("tfidf", make_tfidf(max_features), TEXT_COL),
             ("counts", MinMaxScaler(), count_columns),
         ]
     )
@@ -79,11 +84,11 @@ def train_and_evaluate(model_name, X, y, count_columns, max_features=3000, cv_fo
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Entrena un model.")
+    parser = argparse.ArgumentParser(description="Trains a model.")
     parser.add_argument("--model", required=True,
                         help="logreg | naive_bayes | linear_svm | random_forest")
-    parser.add_argument("--train", required=True, help="CSV de train")
-    parser.add_argument("--model-out", required=True, help="On guardar el model (.joblib)")
+    parser.add_argument("--train", required=True, help="Train CSV")
+    parser.add_argument("--model-out", required=True, help="Output path of the model (.joblib)")
     parser.add_argument("--label-col", default="label")
     parser.add_argument("--max-features", type=int, default=3000)
     parser.add_argument("--cv-folds", type=int, default=5)
@@ -91,7 +96,7 @@ def main():
     args = parser.parse_args()
 
     X, y, count_columns = load_xy(args.train, args.label_col)
-    logger.info("Entrenant '%s' amb %d files", args.model, len(X))
+    logger.info("Training '%s' with %d rows", args.model, len(X))
 
     pipeline, metrics = train_and_evaluate(
         args.model, X, y, count_columns,
@@ -99,13 +104,13 @@ def main():
         cv_folds=args.cv_folds,
         random_state=args.random_state,
     )
-    logger.info("Mètriques (validació creuada): %s", metrics)
-    absolute_parent = Path(args.model_out).resolve().parent
-    absolute_parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline, args.model_out)
-    logger.info("Guardat %s", args.model_out)
-    
-    
+    logger.info("Cross-validation metrics: %s", metrics)
+
+    model_path = Path(args.model_out)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline, model_path)
+    logger.info("Saved %s", model_path)
+
 
 if __name__ == "__main__":
     main()

@@ -1,21 +1,20 @@
-""" First step to clean the raw dataset. It is a command line script that reads a CSV file and outputs a cleaned CSV file.
+"""Phase 1 of the pipeline: raw dataset -> cleaned dataset.
 
-STEPS:
-    1. Remove duplicates (text exacte)
-    2. Count features sobre el text original
-    3. Clean the text (the emojis are preserved)
-    4. Delete duplicates (text net)
+Steps:
+    1. Remove exact duplicates on the original text.
+    2. Compute count features on the original text.
+    3. Clean the text (emojis are preserved by default).
+    4. Remove duplicates on the cleaned text.
 
-usage (from the root of the repo):
-    python -m src.preprocess_dataset --input data/raw/dataset.csv --output data/processed/clean.csv
+Usage (from the root of the repo):
+    python -m src.data_preparation.phase_1_cleaning \
+        --input data/raw/daisy_dataset_spam_detection.csv --output data/processed/clean.csv
 """
 
 import argparse
 import logging
 from pathlib import Path
-
 import pandas as pd
-
 from src.data_preparation import preprocess as pp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -28,9 +27,9 @@ def preprocess_dataframe(df, text_col, label_col, emojis_as_text=False):
     if missing:
         raise KeyError(f"Columns {missing} not found. Columns in CSV: {list(df.columns)}")
 
-    df = df[[text_col, label_col]].dropna(subset=[text_col, label_col])
+    df = df[[text_col, label_col]].dropna(subset=[text_col, label_col]).copy()
     df[text_col] = df[text_col].astype(str)
-    logger.info("Files inicials: %d", len(df))
+    logger.info("Initial rows: %d", len(df))
 
     df = pp.remove_duplicates(df, text_col)
     logger.info("After removing exact duplicates: %d", len(df))
@@ -45,14 +44,18 @@ def preprocess_dataframe(df, text_col, label_col, emojis_as_text=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Preprocessa el dataset raw.")
-    parser.add_argument("--input", required=True, help="CSV raw")
-    parser.add_argument("--output", required=True, help="CSV preprocessat")
+    parser = argparse.ArgumentParser(description="Cleans the raw dataset.")
+    parser.add_argument("--input", required=True, help="Raw CSV")
+    parser.add_argument("--output", required=True, help="Cleaned CSV")
     parser.add_argument("--text-col", default="text")
     parser.add_argument("--label-col", default="label")
     parser.add_argument("--encoding", default="utf-8")
-    parser.add_argument("--emojis-as-text", action="store_true",
-                        help="Converteix els emojis a paraules en lloc de conservar-los")
+    parser.add_argument(
+        "--emojis-as-text",
+        type=lambda s: s.lower() == "true",
+        default=False,
+        help="Convert emojis to words instead of keeping them (true/false)",
+    )
     args = parser.parse_args()
 
     logger.info("Reading %s", args.input)

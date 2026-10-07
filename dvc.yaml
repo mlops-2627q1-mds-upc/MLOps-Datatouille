@@ -1,35 +1,41 @@
 stages:
-  preprocess:
+  clean:
     cmd: >-
       python -m src.data_preparation.phase_1_cleaning
-      --input data/raw/daisy_dataset_spam_detection.csv
-      --output data/processed/clean.csv
-      --text-col text
-      --label-col label
-      --encoding utf-8
+      --input ${data.raw}
+      --output ${data.clean}
+      --text-col ${data.text_col}
+      --label-col ${data.label_col}
+      --encoding ${data.encoding}
+      --emojis-as-text ${data.emojis_as_text}
     deps:
-      - data/raw/daisy_dataset_spam_detection.csv
+      - ${data.raw}
       - src/data_preparation/preprocess.py
       - src/data_preparation/phase_1_cleaning.py
+    params:
+      - data
     outs:
-      - data/processed/clean.csv
+      - ${data.clean}
 
   split:
     cmd: >-
       python -m src.data_preparation.phase_2_splitting
-      --input data/processed/clean.csv
-      --train data/dataset/train.csv
-      --test data/dataset/test.csv
-      --label-col label
-      --test-size 0.2
-      --random-state 42
+      --input ${data.clean}
+      --train ${split.train}
+      --test ${split.test}
+      --label-col ${data.label_col}
+      --test-size ${split.test_size}
+      --random-state ${split.random_state}
     deps:
-      - data/processed/clean.csv
+      - ${data.clean}
       - src/data_preparation/preprocess.py
       - src/data_preparation/phase_2_splitting.py
+    params:
+      - split
+      - data.label_col
     outs:
-      - data/dataset/train.csv
-      - data/dataset/test.csv
+      - ${split.train}
+      - ${split.test}
 
   train:
     foreach: ${train.models}
@@ -37,15 +43,36 @@ stages:
       cmd: >-
         python -m src.modeling.phase_3_training
         --model ${item}
-        --train data/dataset/train.csv
+        --train ${split.train}
         --model-out models/${item}.joblib
-        --label-col label
-        --max-features 3000
-        --cv-folds 5
-        --random-state 42
+        --label-col ${data.label_col}
+        --max-features ${train.max_features}
+        --cv-folds ${train.cv_folds}
+        --random-state ${train.random_state}
       deps:
-        - data/dataset/train.csv
-        - data/dataset/test.csv
+        - ${split.train}
+        - src/data_preparation/preprocess.py
         - src/modeling/phase_3_training.py
+      params:
+        - data.label_col
+        - train.max_features
+        - train.cv_folds
+        - train.random_state
       outs:
         - models/${item}.joblib
+
+  evaluate:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.phase_4_evaluation
+        --model-path models/${item}.joblib
+        --test ${split.test}
+        --label-col ${data.label_col}
+      deps:
+        - models/${item}.joblib
+        - ${split.test}
+        - src/modeling/phase_3_training.py
+        - src/modeling/phase_4_evaluation.py
+      params:
+        - data.label_col
