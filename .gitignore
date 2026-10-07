@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Data is versioned with DVC (see *.dvc and dvc.lock), never with Git
+data/
 
 # C extensions
 *.so
