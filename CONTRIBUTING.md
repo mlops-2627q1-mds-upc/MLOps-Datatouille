@@ -3,30 +3,35 @@ Here you can find the documentation to maintain high code quality, system reprod
 
 ---
 
-## 1. Core Workflow: GitHub Flow
+## 1. Branching Strategy & Architecture: Two-Tiered Staged Flow
 
-We strictly adhere to **GitHub Flow**:
-- The `main` branch is **always deployable** and production-ready.
-- All development is conducted in short feature, bugfix, or task branches created directly from `main`.
-- Direct commits to `main` are strictly prohibited (the branch is protected).
-- All merges require a passing CI/CD test suite and a reviewed, approved Pull Request (PR).
+To support our dual-component ML architecture (primary spam classifier and secondary text analysis model) alongside continuous feedback loops, our team extends basic GitHub Flow into a two-staged architecture:
+
+* `main` (Production):
+  - Always stable, deployable, and production-ready.
+  - Direct pushes and branch deletions are strictly forbidden via GitHub Rulesets.
+  - Only accepts Pull Requests originating from dev. Direct PRs from task branches are blocked at the CI level.
+  - Merges require passing the Comprehensive Pre-Production Validation workflow and at least one peer approval.
+    
+* `dev` (Integration & Staging Server):
+  - Simulates our internal development and integration server.
+  - Direct pushes and branch deletions are strictly forbidden via GitHub Rulesets.
+  - Serves as the base branch for all feature, bugfix, and chore development.
+  - Merges require passing the Fast Feedback & Code Integration workflow and at least one peer review.
+
+* Task branches (`feat/*`, `fix/*`, etc.):
+  - Short-lived branches created directly from dev.
+  - Deleted immediately after squashing and merging into dev.
 
 ---
 
 ## 2. Step-by-Step Contribution Cycle
 
-### Step 1: Claim or Create an Issue
+### Step 1: Claim or Create an Issue & Branch
 Before writing code:
 1. Check the project coordination board (Github's Project section).
 2. (Create) and assign the task to yourself and mark it as *In Progress*. Note the issue ID (e.g., `#12`).
-
-### Step 2: Create a Feature Branch
-Ensure your local `main` is completely up-to-date, then branch off:
-```bash
-git checkout main
-git pull origin main
-git checkout -b <type>/<issue-id>-<short-description>
-```
+3. Create the branch from the same issue.
 
 Branch Naming Convention:
 * feat/12-spam-preprocessing
@@ -34,9 +39,14 @@ Branch Naming Convention:
 * docs/3-dataset-card
 * refactor/8-clean-tokenizer
 
-### Step 3: Local Development & Data Isolation
-1. Virtual Environment: Ensure your virtual environment is activated (source venv/bin/activate).
-2. Data & Model Hygiene (DVC):
+### Step 2: Local Development & Data Isolation
+1. Fetch new branch locally:
+```bash
+git fetch origin
+git checkout branch-name
+```
+2. Virtual Environment: Ensure your virtual environment is activated (source venv/bin/activate).
+3. Data & Model Hygiene (DVC):
     * Never commit large files (.csv, .parquet, .pkl, .onnx, .pt) directly to Git.
     * Use DVC to track data dumps or model artifacts:
     ```bash
@@ -45,7 +55,7 @@ Branch Naming Convention:
     dvc push
     ```
 
-### Step 4: Crafting Standard Git Commits
+### Step 3: Crafting Standard Git Commits
 We adhere strictly to the 7 Rules of Git Commit Messages:
 1. Separate subject from body with a blank line.
 2. Limit the subject line to 50 characters.
@@ -69,16 +79,19 @@ Push changes to the remote feature branch:
 git push -u origin <branch-name>
 ```
 
-### Step 5: Open a Pull Request (PR)
-1. Open the PR targeting ```base: main``` from ```compare: <branch-name>```.
+### Step 4: Open a Pull Request targeting `dev`
+1. Open the PR targeting ```base: dev``` from ```compare: <branch-name>```.
 2. Link the issue with Closes #<id>, and list tested items).
 3. Request a review from at least one teammate.
 
-### Step 6: Automated CI/CD Tests & Code Review
-* **Continuous Integration:** GitHub Actions will automatically run the integration test suite (Pytest, Flake8) against your branch. These checks must pass before merging.   
-* **Peer Review:** The reviewer tests the code locally or inspects the diff. If updates are needed, make additional commits to the same branch and push.
+### Step 5: Automated CI Gate (`dev`) & Peer Review
+* **Automated Status Check:** GitHub Actions triggers the Fast Feedback & Code Integration job:
+  - Enforces Flake8 and Pylint linting.
+  - Executes unit tests under tests/unit/ (FastAPI route schemas, helper logic).
+  - Executes lightweight Great Expectations schema checks on sample data.
+* **Peer Review:** Reviewers inspect the code diff and verify that logic and formatting standards are maintained.
 
-### Step 7: Squash and Merge
+### Step 6: Squash and Merge
 Our repository is configured to strictly enforce **Squash and Merge**.
 * Once approved and all CI checks pass, click Squash and merge.
 * Ensure the final squashed commit message adheres to the 7 Git commit rules, summarizing the entire PR.
@@ -92,7 +105,24 @@ Our repository is configured to strictly enforce **Squash and Merge**.
 
 ---
 
-## 3. Coding Good Practices
+## 3. Release & Pre-Production Promotion (`dev` $\rightarrow$ `main`)
+When a sprint milestone is complete and integrated within dev, code is promoted to main for release and production serving.
+1. Open a Pull Request configuring: `base: main` $\$leftarrow `compare: dev`
+2. **Automated CI Gate (`main`)**: GitHub Actions triggers the Comprehensive Pre-Production Validation job:
+   - Source Verification: Fails immediately if the PR originates from any branch other than `dev`.
+   - Full Data Pipeline Validation: Executes complete Great Expectations suites against the full dataset to prevent the data from schema corruption.
+   - Automated Regression Testing: Runs tests/regression/ using Pytest to ensure model accuracy, classification boundaries, and confidence scores exceed our baselines.
+   - Multi-Component Integration: Validates full integration of the spam classifier, the secondary text component (summarizer or multilabel classifier), and endpoints.
+3. **Approval**: Requires formal sign-off from team maintainers.
+4. **Merge & Tag**: Merge into main and create a release tag for production tracking:
+   ```bash
+   git checkout main
+   git pull origin main
+   git tag -a v1.0.0 -m "Release Milestone v1.0.0"
+   git push origin v1.0.0
+   ```
+
+## 4. Coding Good Practices
 
 Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 
@@ -126,7 +156,7 @@ Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 * Add a Pytest test for each new function in `src/`.
 * Do not commit dead code, commented code, or debug files.
 
-### 3.1 Function Documentation: Google Python Style
+### Function Documentation: Google Python Style
 
 * Document all public functions, classes, and methods.
 * Use Google Style docstrings.
