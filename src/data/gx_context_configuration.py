@@ -1,17 +1,18 @@
-"""Great Expectations configuration: what the raw dataset must look like.
+"""Great Expectations configuration: what the cleaned dataset must look like.
 
 Creates (or updates) the GX file context in gx/ with:
-    - a pandas data source pointing to data/raw/,
-    - the expectation suite of the raw dataset,
+    - a pandas data source pointing to data/processed/,
+    - the expectation suite of the cleaned dataset,
     - a validation definition and a checkpoint that runs it.
 
-Then it runs the checkpoint and exits with an error if the raw data does not meet
+Then it runs the checkpoint and exits with an error if the processed data does not meet
 the expectations. The HTML report is written to gx/uncommitted/data_docs/.
 
 Usage (from the root of the repo):
     python -m src.data.gx_context_configuration
 """
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -23,33 +24,61 @@ logger = logging.getLogger(__name__)
 logging.getLogger("great_expectations").setLevel(logging.WARNING)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-RAW_DIR = ROOT_DIR / "data" / "raw"
-RAW_FILE = "daisy_dataset_spam_detection.csv"
+PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+PROCESSED_FILE = "clean.csv"
 
 TEXT_COL = "text"
 LABEL_COL = "label"
+CLEAN_TEXT_COL = "clean_text"
 LABELS = ["spam", "not_spam"]
+COUNT_COLUMNS = [
+    "n_characters",
+    "n_words",
+    "n_sentences",
+    "n_uppercase",
+    "n_urls",
+    "n_emojis",
+    "n_punctuation",
+]
+EXPECTED_COLUMNS = [
+    TEXT_COL,
+    LABEL_COL,
+    *COUNT_COLUMNS,
+    CLEAN_TEXT_COL,
+]
 
-DATA_SOURCE_NAME = "raw_data"
-ASSET_NAME = "spam_dataset"
+DATA_SOURCE_NAME = "processed_data"
+ASSET_NAME = "clean_spam_dataset"
 BATCH_NAME = "full_csv"
-SUITE_NAME = "raw_spam_dataset_suite"
-VALIDATION_NAME = "raw_spam_dataset_validation"
-CHECKPOINT_NAME = "raw_spam_dataset_checkpoint"
+SUITE_NAME = "processed_spam_dataset_suite"
+VALIDATION_NAME = "processed_spam_dataset_validation"
+CHECKPOINT_NAME = "processed_spam_dataset_checkpoint"
+VALIDATION_REPORT = ROOT_DIR / "data" / "processed" / "gx_validation.json"
 
 
 def build_expectations():
-    """Expectations that the raw dataset must meet before entering the pipeline."""
-    return [
-        gxe.ExpectTableColumnsToMatchOrderedList(column_list=[TEXT_COL, LABEL_COL]),
-        gxe.ExpectTableRowCountToBeBetween(min_value=1000),
+    """Expectations that the cleaned dataset must meet before splitting."""
+    expectations = [
+        gxe.ExpectTableColumnsToMatchOrderedList(column_list=EXPECTED_COLUMNS),
+        gxe.ExpectTableRowCountToBeBetween(min_value=1),
         gxe.ExpectColumnValuesToNotBeNull(column=TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=TEXT_COL, min_value=1),
+        gxe.ExpectColumnValuesToNotBeNull(column=CLEAN_TEXT_COL),
+        gxe.ExpectColumnValuesToBeOfType(column=CLEAN_TEXT_COL, type_="str"),
+        gxe.ExpectColumnValueLengthsToBeBetween(column=CLEAN_TEXT_COL, min_value=1),
         gxe.ExpectColumnValuesToNotBeNull(column=LABEL_COL),
         gxe.ExpectColumnValuesToBeInSet(column=LABEL_COL, value_set=LABELS),
         gxe.ExpectColumnDistinctValuesToEqualSet(column=LABEL_COL, value_set=LABELS),
     ]
+    for column in COUNT_COLUMNS:
+        expectations.extend(
+            [
+                gxe.ExpectColumnValuesToNotBeNull(column=column),
+                gxe.ExpectColumnValuesToBeBetween(column=column, min_value=0),
+            ]
+        )
+    return expectations
 
 
 def configure_context():
@@ -57,10 +86,10 @@ def configure_context():
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
     data_source = context.data_sources.add_or_update_pandas_filesystem(
-        name=DATA_SOURCE_NAME, base_directory=RAW_DIR
+        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR
     )
     asset = data_source.add_csv_asset(name=ASSET_NAME)
-    batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=RAW_FILE)
+    batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)
 
     suite = gx.ExpectationSuite(name=SUITE_NAME)
     for expectation in build_expectations():
@@ -82,19 +111,37 @@ def configure_context():
 
 def main():
     checkpoint = configure_context()
-    logger.info("Validating %s", RAW_DIR / RAW_FILE)
+    logger.info("Validating %s", PROCESSED_DIR / PROCESSED_FILE)
     result = checkpoint.run()
 
+    expectation_results = []
     for validation_result in result.run_results.values():
         for res in validation_result.results:
             config = res.expectation_config
             status = "OK  " if res.success else "FAIL"
             logger.info("%s %s %s", status, config.type, config.kwargs.get("column", ""))
+            expectation_results.append(
+                {
+                    "expectation": config.type,
+                    "column": config.kwargs.get("column"),
+                    "success": res.success,
+                }
+            )
+
+    VALIDATION_REPORT.parent.mkdir(parents=True, exist_ok=True)
+    VALIDATION_REPORT.write_text(
+        json.dumps(
+            {"success": result.success, "expectations": expectation_results},
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     if not result.success:
-        logger.error("The raw dataset does not meet the expectations")
+        logger.error("The processed dataset does not meet the expectations")
         sys.exit(1)
-    logger.info("The raw dataset meets all the expectations")
+    logger.info("The processed dataset meets all the expectations; report: %s", VALIDATION_REPORT)
 
 
 if __name__ == "__main__":

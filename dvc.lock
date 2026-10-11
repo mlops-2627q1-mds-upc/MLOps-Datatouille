@@ -9,6 +9,10 @@ stages:
       hash: md5
       md5: 181a179938ed0ef6966fe714206c4283
       size: 4744764
+    - path: data/processed/gx_validation.json
+      hash: md5
+      md5: 770822c2b0d92da5626c5ac343b9a4b5
+      size: 3134
     - path: src/data/phase_2_splitting.py
       hash: md5
       md5: 16a54af286036bf76cf159e86634ea02
@@ -270,3 +274,35 @@ stages:
     params:
       params.yaml:
         data.label_col: label
+  validate_processed:
+    cmd: python -m src.data.gx_context_configuration
+    deps:
+    - path: data/processed/clean.csv
+      hash: md5
+      md5: 181a179938ed0ef6966fe714206c4283
+      size: 4744764
+    - path: gx/checkpoints/processed_spam_dataset_checkpoint.json
+      hash: md5
+      md5: 38e72a382fb149988a6407fac5356740
+      size: 399
+    - path: gx/expectations/processed_spam_dataset_suite.json
+      hash: md5
+      md5: 703f436529f7f80c65addc5afb745e6c
+      size: 6393
+    - path: gx/great_expectations.yml
+      hash: md5
+      md5: cbf4476675aec2c14982caf86b931a22
+      size: 1882
+    - path: gx/validation_definitions/processed_spam_dataset_validation.json
+      hash: md5
+      md5: 7ef68d71e5496ebaaa201740125310a7
+      size: 553
+    - path: src/data/gx_context_configuration.py
+      hash: md5
+      md5: 82a12b36b71b9ffc137accb26fca34cf
+      size: 5224
+    outs:
+    - path: data/processed/gx_validation.json
+      hash: md5
+      md5: 770822c2b0d92da5626c5ac343b9a4b5
+      size: 3134

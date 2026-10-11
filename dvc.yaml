@@ -17,6 +17,18 @@ stages:
     outs:
       - ${data.clean}
 
+  validate_processed:
+    cmd: python -m src.data.gx_context_configuration
+    deps:
+      - ${data.clean}
+      - src/data/gx_context_configuration.py
+      - gx/great_expectations.yml
+      - gx/expectations/processed_spam_dataset_suite.json
+      - gx/validation_definitions/processed_spam_dataset_validation.json
+      - gx/checkpoints/processed_spam_dataset_checkpoint.json
+    outs:
+      - data/processed/gx_validation.json
+
   split:
     cmd: >-
       python -m src.data.phase_2_splitting
@@ -28,6 +40,7 @@ stages:
       --random-state ${split.random_state}
     deps:
       - ${data.clean}
+      - data/processed/gx_validation.json
       - src/data/split_data.py
       - src/data/phase_2_splitting.py
     params:
