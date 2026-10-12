@@ -166,7 +166,8 @@ Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 Example:
 ```python
 def clean_text(text: str, lowercase: bool = True) -> str:
-    """Clean raw message text for spam classification.
+    """
+    Clean raw message text for spam classification.
 
     Args:
         text: Raw input message.
