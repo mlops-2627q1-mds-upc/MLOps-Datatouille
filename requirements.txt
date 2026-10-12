@@ -14,7 +14,7 @@ mkdocs
 pip
 pytest
 python-dotenv
-ruff
+ruff==0.16.9
 tqdm
 typer
 -e .

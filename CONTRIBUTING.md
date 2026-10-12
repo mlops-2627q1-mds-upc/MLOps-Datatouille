@@ -86,7 +86,7 @@ git push -u origin <branch-name>
 
 ### Step 5: Automated CI Gate (`dev`) & Peer Review
 * **Automated Status Check:** GitHub Actions triggers the Fast Feedback & Code Integration job:
-  - Enforces Flake8 and Pylint linting.
+  - Enforces Ruff linting (`ruff check src tests`) and formatting (`ruff format --check src tests`) per `pyproject.toml`.
   - Executes unit tests under tests/unit/ (FastAPI route schemas, helper logic).
   - Executes lightweight Great Expectations schema checks on sample data.
 * **Peer Review:** Reviewers inspect the code diff and verify that logic and formatting standards are maintained.
