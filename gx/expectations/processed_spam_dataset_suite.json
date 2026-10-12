@@ -1,0 +1,265 @@
+{
+  "expectations": [
+    {
+      "id": "faac4a1e-d74a-4430-869d-db10e93af322",
+      "kwargs": {
+        "column_list": [
+          "text",
+          "label",
+          "n_characters",
+          "n_words",
+          "n_sentences",
+          "n_uppercase",
+          "n_urls",
+          "n_emojis",
+          "n_punctuation",
+          "clean_text"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_table_columns_to_match_ordered_list"
+    },
+    {
+      "id": "0979ded3-b86e-4c58-8ae3-b14f4185b7f7",
+      "kwargs": {
+        "min_value": 1
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_table_row_count_to_be_between"
+    },
+    {
+      "id": "34da931e-fed5-40c3-b08c-4dd1adc70cc2",
+      "kwargs": {
+        "column": "text"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "3007f34e-dfb2-41d9-9990-05dfec51b9f5",
+      "kwargs": {
+        "column": "text",
+        "type_": "str"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "27cf4ff4-b4e9-4514-aa7e-fb3b527eabfd",
+      "kwargs": {
+        "column": "text",
+        "min_value": 1
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_value_lengths_to_be_between"
+    },
+    {
+      "id": "520e0908-fc31-4d1b-a726-adff05a411ce",
+      "kwargs": {
+        "column": "clean_text"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "81dd7f78-7696-49c2-a06a-1a2a239ac309",
+      "kwargs": {
+        "column": "clean_text",
+        "type_": "str"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_of_type"
+    },
+    {
+      "id": "00023595-5048-4717-9f17-f185a98fc9c9",
+      "kwargs": {
+        "column": "clean_text",
+        "min_value": 1
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_value_lengths_to_be_between"
+    },
+    {
+      "id": "87b1ed00-57af-4448-84b4-15c1fbdefac8",
+      "kwargs": {
+        "column": "label"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "4caf7e45-b5ed-4961-b79c-61d748a216e3",
+      "kwargs": {
+        "column": "label",
+        "value_set": [
+          "spam",
+          "not_spam"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "42527b85-cafd-4f3d-904b-047b69c86897",
+      "kwargs": {
+        "column": "label",
+        "value_set": [
+          "spam",
+          "not_spam"
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_distinct_values_to_equal_set"
+    },
+    {
+      "id": "e6a8dbf3-b172-4323-9946-8046c84b47b4",
+      "kwargs": {
+        "column": "n_characters"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "56993a81-6b2a-4fe9-a160-b790f5fbd638",
+      "kwargs": {
+        "column": "n_characters",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "88b87f9d-dddb-4f20-abc9-670fa486b103",
+      "kwargs": {
+        "column": "n_words"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "21d4d668-1f63-4753-be40-cec27b38f433",
+      "kwargs": {
+        "column": "n_words",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "26c6c20c-a647-4755-9b07-6f6e433461d7",
+      "kwargs": {
+        "column": "n_sentences"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "aefc4cbd-bf2e-4b43-b290-0743cc0543ff",
+      "kwargs": {
+        "column": "n_sentences",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "219bfeed-94b9-49e3-b38c-f65dbf50174c",
+      "kwargs": {
+        "column": "n_uppercase"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "dac08408-6788-4182-8c3b-8e509e2196b8",
+      "kwargs": {
+        "column": "n_uppercase",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "ca996012-b57b-463d-aae2-f61c244b8136",
+      "kwargs": {
+        "column": "n_urls"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "f04f045f-946c-41dc-9d39-6b473d9cd229",
+      "kwargs": {
+        "column": "n_urls",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "9752583e-7923-4b14-ab8d-4e824c0fe1f6",
+      "kwargs": {
+        "column": "n_emojis"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "c2bd0512-e3eb-4f26-a4ed-e5988aa52a90",
+      "kwargs": {
+        "column": "n_emojis",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "841b7e5a-0ee2-42cb-88d7-8109f8d67911",
+      "kwargs": {
+        "column": "n_punctuation"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "b80494c8-6798-446f-817b-ecdcabcf7a9b",
+      "kwargs": {
+        "column": "n_punctuation",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    }
+  ],
+  "id": "dc26b41a-3626-4a65-996e-53028a4104fe",
+  "meta": {
+    "great_expectations_version": "1.23.2"
+  },
+  "name": "processed_spam_dataset_suite",
+  "notes": null
+}

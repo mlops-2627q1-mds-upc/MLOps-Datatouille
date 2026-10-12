@@ -1,0 +1,91 @@
+stages:
+  clean:
+    cmd: >-
+      python -m src.data.phase_1_cleaning
+      --input ${data.raw}
+      --output ${data.clean}
+      --text-col ${data.text_col}
+      --label-col ${data.label_col}
+      --encoding ${data.encoding}
+      --emojis-as-text ${data.emojis_as_text}
+    deps:
+      - ${data.raw}
+      - src/data/preprocess.py
+      - src/data/phase_1_cleaning.py
+    params:
+      - data
+    outs:
+      - ${data.clean}
+
+  validate_processed:
+    cmd: python -m src.data.gx_context_configuration
+    deps:
+      - ${data.clean}
+      - src/data/gx_context_configuration.py
+      - gx/great_expectations.yml
+      - gx/expectations/processed_spam_dataset_suite.json
+      - gx/validation_definitions/processed_spam_dataset_validation.json
+      - gx/checkpoints/processed_spam_dataset_checkpoint.json
+    outs:
+      - data/processed/gx_validation.json
+
+  split:
+    cmd: >-
+      python -m src.data.phase_2_splitting
+      --input ${data.clean}
+      --train ${split.train}
+      --test ${split.test}
+      --label-col ${data.label_col}
+      --test-size ${split.test_size}
+      --random-state ${split.random_state}
+    deps:
+      - ${data.clean}
+      - data/processed/gx_validation.json
+      - src/data/split_data.py
+      - src/data/phase_2_splitting.py
+    params:
+      - split
+      - data.label_col
+    outs:
+      - ${split.train}
+      - ${split.test}
+
+  train:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.phase_3_training
+        --model ${item}
+        --train ${split.train}
+        --model-out models/${item}.joblib
+        --label-col ${data.label_col}
+        --max-features ${train.max_features}
+        --cv-folds ${train.cv_folds}
+        --random-state ${train.random_state}
+      deps:
+        - ${split.train}
+        - src/data/preprocess.py
+        - src/modeling/phase_3_training.py
+      params:
+        - data.label_col
+        - train.max_features
+        - train.cv_folds
+        - train.random_state
+      outs:
+        - models/${item}.joblib
+
+  evaluate:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.phase_4_evaluation
+        --model-path models/${item}.joblib
+        --test ${split.test}
+        --label-col ${data.label_col}
+      deps:
+        - models/${item}.joblib
+        - ${split.test}
+        - src/modeling/phase_3_training.py
+        - src/modeling/phase_4_evaluation.py
+      params:
+        - data.label_col
