@@ -7,3 +7,14 @@ nltk==3.9.2
 pandas==2.3.3
 pytest==8.4.2
 scikit-learn==1.7.2
+awscli
+datasets
+loguru
+mkdocs
+pip
+pytest
+python-dotenv
+ruff
+tqdm
+typer
+-e .
