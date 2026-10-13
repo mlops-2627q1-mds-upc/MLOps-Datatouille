@@ -18,6 +18,7 @@ from src.config import (
 
 EMISSIONS_FILE = "emissions.csv"
 
+
 def build_tracker(stage: str, output_dir: Path = EMISSIONS_DIR) -> OfflineEmissionsTracker:
     """Create an offline CodeCarbon tracker for one pipeline stage.
 
@@ -74,7 +75,9 @@ def _log_to_mlflow(stage: str, summary: dict[str, float], csv_path: Path) -> Non
 
 
 @contextmanager
-def track_emissions(stage: str, output_dir: Path = EMISSIONS_DIR) -> Iterator[OfflineEmissionsTracker]:
+def track_emissions(
+    stage: str, output_dir: Path = EMISSIONS_DIR
+) -> Iterator[OfflineEmissionsTracker]:
     """Measure energy and CO2 of the wrapped block and record the result.
 
     The result is appended to `<output_dir>/emissions.csv` and, if an MLflow
