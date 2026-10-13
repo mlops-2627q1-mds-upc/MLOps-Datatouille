@@ -6,6 +6,7 @@ from pathlib import Path
 
 from codecarbon import OfflineEmissionsTracker
 from loguru import logger
+import mlflow
 
 from src.config import (
     CODECARBON_COUNTRY_ISO_CODE,
@@ -66,10 +67,6 @@ def _log_to_mlflow(stage: str, summary: dict[str, float], csv_path: Path) -> Non
         summary: Output of `emissions_summary`.
         csv_path: Path to the CodeCarbon CSV, logged as an artifact.
     """
-    try:
-        import mlflow
-    except ImportError:
-        return
     if mlflow.active_run() is None:
         return
     mlflow.log_metrics({f"{stage}_{key}": value for key, value in summary.items()})
