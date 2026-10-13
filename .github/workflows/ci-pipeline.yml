@@ -26,15 +26,13 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest flake8 pylint great_expectations fastapi httpx
+          pip install pytest great_expectations fastapi httpx
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Static Code Analysis (Flake8 & Pylint)
+      - name: Static Code Analysis (Ruff)
         run: |
-          flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-          # Pylint is required for Milestone 3 quality assurance
-          pylint src/ tests/ --exit-zero
+          ruff check src tests
+          ruff format --check src tests
 
       - name: Run Unit Tests (FastAPI & Logic)
         # Only runs fast unit tests located in the unit directory

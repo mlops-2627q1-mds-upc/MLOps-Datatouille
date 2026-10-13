@@ -14,8 +14,9 @@ Usage (from the root of the repo):
 
 import json
 import logging
-import sys
 from pathlib import Path
+import sys
+
 import great_expectations as gx
 import great_expectations.expectations as gxe
 
