@@ -3,6 +3,7 @@ codecarbon>=3.0
 datasets
 loguru
 mkdocs
+mlflow
 pip
 pytest
 python-dotenv
