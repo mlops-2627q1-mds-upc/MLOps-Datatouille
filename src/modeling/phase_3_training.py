@@ -4,6 +4,7 @@ Usage (from the root of the repo):
     python -m src.modeling.phase_3_training --model logreg \
         --train data/dataset/train.csv --model-out models/logreg.joblib
 """
+
 import argparse
 import logging
 from pathlib import Path
@@ -31,11 +32,14 @@ SCORING = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 def get_classifier(name, random_state=42):
     """Returns the classifier corresponding to `name`."""
     classifiers = {
-        "logreg": LogisticRegression(max_iter=1000, class_weight="balanced", random_state=random_state),
+        "logreg": LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=random_state
+        ),
         "naive_bayes": MultinomialNB(),
         "linear_svm": LinearSVC(class_weight="balanced", random_state=random_state),
-        "random_forest": RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                                random_state=random_state, n_jobs=-1),
+        "random_forest": RandomForestClassifier(
+            n_estimators=300, class_weight="balanced", random_state=random_state, n_jobs=-1
+        ),
     }
     if name not in classifiers:
         raise ValueError(f"Unknown model '{name}'. Options: {sorted(classifiers)}")
@@ -62,6 +66,7 @@ def build_pipeline(model_name, count_columns, max_features=3000, random_state=42
         ]
     )
 
+
 def load_xy(path, label_col):
     """Loads a CSV file and separates it into features (X) and target (y)."""
     df = pd.read_csv(path)
@@ -70,7 +75,9 @@ def load_xy(path, label_col):
     return df[[TEXT_COL] + count_columns], df[label_col], count_columns
 
 
-def train_and_evaluate(model_name, X, y, count_columns, max_features=3000, cv_folds=5, random_state=42):
+def train_and_evaluate(
+    model_name, X, y, count_columns, max_features=3000, cv_folds=5, random_state=42
+):
     """Performs cross-validation on train data and final training with all train data."""
     pipeline = build_pipeline(model_name, count_columns, max_features, random_state)
 
@@ -85,8 +92,9 @@ def train_and_evaluate(model_name, X, y, count_columns, max_features=3000, cv_fo
 
 def main():
     parser = argparse.ArgumentParser(description="Trains a model.")
-    parser.add_argument("--model", required=True,
-                        help="logreg | naive_bayes | linear_svm | random_forest")
+    parser.add_argument(
+        "--model", required=True, help="logreg | naive_bayes | linear_svm | random_forest"
+    )
     parser.add_argument("--train", required=True, help="Train CSV")
     parser.add_argument("--model-out", required=True, help="Output path of the model (.joblib)")
     parser.add_argument("--label-col", default="label")
@@ -99,7 +107,10 @@ def main():
     logger.info("Training '%s' with %d rows", args.model, len(X))
 
     pipeline, metrics = train_and_evaluate(
-        args.model, X, y, count_columns,
+        args.model,
+        X,
+        y,
+        count_columns,
         max_features=args.max_features,
         cv_folds=args.cv_folds,
         random_state=args.random_state,

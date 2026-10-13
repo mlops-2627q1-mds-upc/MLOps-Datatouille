@@ -14,7 +14,9 @@ Usage (from the root of the repo):
 import argparse
 import logging
 from pathlib import Path
+
 import pandas as pd
+
 from src.data import preprocess as pp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -50,7 +52,12 @@ def main():
     parser.add_argument("--text-col", default="text")
     parser.add_argument("--label-col", default="label")
     parser.add_argument("--encoding", default="utf-8")
-    parser.add_argument("--emojis-as-text", type=lambda s: s.lower() == "true", default=False, help="Convert emojis to words instead of keeping them (true/false)",)
+    parser.add_argument(
+        "--emojis-as-text",
+        type=lambda s: s.lower() == "true",
+        default=False,
+        help="Convert emojis to words instead of keeping them (true/false)",
+    )
     args = parser.parse_args()
 
     logger.info("Reading %s", args.input)
