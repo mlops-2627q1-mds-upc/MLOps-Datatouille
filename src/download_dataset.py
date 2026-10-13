@@ -11,7 +11,8 @@ def download_dataset(
     dataset_id: str = DATASET_ID,
     output_path: Path = RAW_PATH,
 ) -> Path:
-    """Download HF dataset and save it as a raw CSV.
+    """
+    Download HF dataset and save it as a raw CSV.
 
     Args:
         dataset_id: Hugging Face dataset identifier.
