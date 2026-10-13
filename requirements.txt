@@ -8,9 +8,11 @@ pandas==2.3.3
 pytest==8.4.2
 scikit-learn==1.7.2
 awscli
+codecarbon>=3.0
 datasets
 loguru
 mkdocs
+mlflow
 pip
 pytest
 python-dotenv
