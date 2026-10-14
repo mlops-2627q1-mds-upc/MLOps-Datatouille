@@ -40,6 +40,8 @@ jobs:
         # Only runs fast unit tests located in the unit directory
         run: |
           pytest tests/unit/ -v
+          pytest tests/regression -v
+          pytest tests/integration/ -v
 
       - name: Lightweight Data Validation (Sample)
         # Runs Great Expectations on a small sample to catch schema errors quickly
@@ -84,3 +86,5 @@ jobs:
         # Runs the heavy regression suite to ensure model performance hasn't degraded
         run: |
           pytest tests/regression/ -v
+          pytest tests/integration/ -v
+          pytest tests/unit/ -v

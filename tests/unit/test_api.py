@@ -1,3 +1,5 @@
+"""Placeholder unit tests for the planned API endpoints."""
+
 import pytest
 from fastapi.testclient import TestClient
 # from src.api.main import app  # Uncomment when FastAPI is implemented

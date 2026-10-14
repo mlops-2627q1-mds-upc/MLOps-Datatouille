@@ -6,21 +6,15 @@ from nltk.stem import PorterStemmer     # pip install nltk
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
 
-# ---------------------------------------------------------------------------
-# 0. PATTERNS.
-# ---------------------------------------------------------------------------
-
 URL_PATTERN = r"https?://\S+|www\.\S+"
 MONEY_PATTERN = (
-    r"(?:\$|€|£|\b(?:USD|EUR|GBP)\b)\s*\d+(?:[.,]\d+)*"     # $100, € 10.000, USD 50
-    r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"      # 500$, 10.000 €, 50USD
+    r"(?:\$|€|£|\b(?:USD|EUR|GBP)\b)\s*\d+(?:[.,]\d+)*"
+    r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"
 )
 SENTENCE_END_PATTERN = r"[.!?]+"
-
 URL_TOKEN = "xxurl"
 MONEY_TOKEN = "xxmoney"
 SPECIAL_TOKENS = {URL_TOKEN, MONEY_TOKEN}
-
 _stemmer = PorterStemmer()
 
 # ---------------------------------------------------------------------------

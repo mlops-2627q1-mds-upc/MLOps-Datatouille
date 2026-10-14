@@ -1,0 +1,124 @@
+"""Integration tests for the project's Great Expectations configuration.
+
+These tests verify that the configured expectations accept valid data and reject
+invalid data. They are separate from the Great Expectations validation itself,
+which runs in the DVC ``validate_processed`` stage.
+"""
+
+import great_expectations as gx
+import pandas as pd
+import pytest
+from great_expectations import ValidationDefinition
+from pytest import fixture
+
+from src.data.gx_context_configuration import (
+    EXPECTED_COLUMNS,
+    ROOT_DIR,
+    VALIDATION_NAME,
+    build_expectations,
+)
+
+
+@fixture
+def processed_data_validator() -> ValidationDefinition:
+    context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
+    return context.validation_definitions.get(VALIDATION_NAME)
+
+
+def test_processed_data(processed_data_validator: ValidationDefinition):
+    validation_result = processed_data_validator.run(result_format="BOOLEAN_ONLY")
+    expectations_failed = validation_result["statistics"]["unsuccessful_expectations"]
+    assert expectations_failed == 0, f"There were {expectations_failed} failing expectations."
+
+
+def _validate_dataframe(dataframe: pd.DataFrame):
+    """Run the project's actual expectations against an in-memory DataFrame."""
+    context = gx.get_context(mode="ephemeral")
+    data_source = context.data_sources.add_pandas(name="preprocessing_test_source")
+    asset = data_source.add_dataframe_asset(name="preprocessing_test_asset")
+    batch_definition = asset.add_batch_definition_whole_dataframe("preprocessing_test_batch")
+    batch = batch_definition.get_batch(batch_parameters={"dataframe": dataframe})
+
+    suite = gx.ExpectationSuite(name="preprocessing_test_suite")
+    for expectation in build_expectations():
+        suite.add_expectation(expectation)
+
+    validator = context.get_validator(batch=batch, expectation_suite=suite)
+    return validator.validate()
+
+
+def _valid_processed_dataframe() -> pd.DataFrame:
+    """Create a small DataFrame that satisfies the configured dataset expectations."""
+    return pd.DataFrame(
+        [
+            ["Win prize", "spam", 9, 2, 1, 2, 0, 0, 1, "win prize"],
+            ["Team meeting", "not_spam", 12, 2, 1, 1, 0, 0, 0, "team meet"],
+        ],
+        columns=EXPECTED_COLUMNS,
+    )
+
+
+def test_configured_expectations_accept_valid_processed_dataframe():
+    """Test of accepting an in-memory dataset that satisfies all configured expectations."""
+    result = _validate_dataframe(_valid_processed_dataframe())
+
+    assert result.success
+    assert all(expectation_result.success for expectation_result in result.results)
+
+
+@pytest.mark.parametrize(
+    "column, invalid_value, expected_expectation",
+    [
+        ("label", "unknown", "expect_column_values_to_be_in_set"),
+        ("clean_text", None, "expect_column_values_to_not_be_null"),
+        ("n_urls", -1, "expect_column_values_to_be_between"),
+    ],
+)
+def test_configured_expectations_reject_invalid_processed_data(
+    column: str,
+    invalid_value: object,
+    expected_expectation: str,
+):
+    """Test of rejecting invalid labels, null cleaned text, and negative count features."""
+    dataframe = _valid_processed_dataframe()
+    dataframe.loc[0, column] = invalid_value
+
+    result = _validate_dataframe(dataframe)
+    failed_expectation_types = {
+        expectation_result.expectation_config.type
+        for expectation_result in result.results
+        if not expectation_result.success
+    }
+
+    assert not result.success
+    assert expected_expectation in failed_expectation_types
+
+
+@pytest.mark.parametrize(
+    "column, invalid_values",
+    [
+        ("label", [0, 1]),
+        ("clean_text", [1, 2]),
+        ("n_characters", ["9", "12"]),
+    ],
+)
+def test_configured_expectations_reject_incorrect_column_types(
+    column: str,
+    invalid_values: list[object],
+):
+    """Test of rejecting non-string labels/text and non-integer count features."""
+    dataframe = _valid_processed_dataframe()
+    dataframe[column] = invalid_values
+
+    result = _validate_dataframe(dataframe)
+    failed_expectations = {
+        (
+            expectation_result.expectation_config.type,
+            expectation_result.expectation_config.kwargs.get("column"),
+        )
+        for expectation_result in result.results
+        if not expectation_result.success
+    }
+
+    assert not result.success
+    assert ("expect_column_values_to_be_of_type", column) in failed_expectations

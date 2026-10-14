@@ -8,6 +8,8 @@ stages:
       --label-col ${data.label_col}
       --encoding ${data.encoding}
       --emojis-as-text ${data.emojis_as_text}
+      --anonymize ${data.anonymize}
+      --ner-model ${data.ner_model}
     deps:
       - ${data.raw}
       - src/data/preprocess.py
@@ -65,6 +67,7 @@ stages:
       deps:
         - ${split.train}
         - src/data/preprocess.py
+        - src/config.py
         - src/modeling/phase_3_training.py
       params:
         - data.label_col
