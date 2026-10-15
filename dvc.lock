@@ -15,12 +15,12 @@ stages:
       size: 4417
     - path: src/data/phase_2_splitting.py
       hash: md5
-      md5: e1ffb269d550b5ddbafa8607e3a0334e
-      size: 1587
+      md5: 9f914a69693cee2ccd79fa55cef68241
+      size: 1544
     - path: src/data/split_data.py
       hash: md5
-      md5: 958bcb1e8cbd814e1f463153a2e57fc4
-      size: 419
+      md5: 48c24c14e572024f0f8813e7c1857c03
+      size: 407
     params:
       params.yaml:
         data.label_col: label
@@ -49,16 +49,16 @@ stages:
       size: 3767442
     - path: src/config.py
       hash: md5
-      md5: fb90983f21b747c08f9a393e277069ec
-      size: 1244
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
     - path: src/data/preprocess.py
       hash: md5
-      md5: 201952537abdef4eab91753dbf219197
-      size: 7005
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     params:
       params.yaml:
         data.label_col: label
@@ -68,7 +68,7 @@ stages:
     outs:
     - path: models/logreg.joblib
       hash: md5
-      md5: 0f4e3426f72d5fd7d1f895bd60235922
+      md5: 9c5d4c49f63f5ac4145c34ebc82efa4c
       size: 134481
   train@naive_bayes:
     cmd: python -m src.modeling.phase_3_training --model naive_bayes --train 
@@ -81,16 +81,16 @@ stages:
       size: 3767442
     - path: src/config.py
       hash: md5
-      md5: fb90983f21b747c08f9a393e277069ec
-      size: 1244
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
     - path: src/data/preprocess.py
       hash: md5
-      md5: 201952537abdef4eab91753dbf219197
-      size: 7005
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     params:
       params.yaml:
         data.label_col: label
@@ -100,7 +100,7 @@ stages:
     outs:
     - path: models/naive_bayes.joblib
       hash: md5
-      md5: 37e1d4e52e8c2519b5465f49dfc7de87
+      md5: 25f0bba00f3b8f82c6634c273179723b
       size: 206521
   train@linear_svm:
     cmd: python -m src.modeling.phase_3_training --model linear_svm --train 
@@ -113,16 +113,16 @@ stages:
       size: 3767442
     - path: src/config.py
       hash: md5
-      md5: fb90983f21b747c08f9a393e277069ec
-      size: 1244
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
     - path: src/data/preprocess.py
       hash: md5
-      md5: 201952537abdef4eab91753dbf219197
-      size: 7005
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     params:
       params.yaml:
         data.label_col: label
@@ -132,7 +132,7 @@ stages:
     outs:
     - path: models/linear_svm.joblib
       hash: md5
-      md5: f51cf400850f101500088636b457a622
+      md5: f40c802f678eb5eec68032ec4ce902c4
       size: 134365
   train@random_forest:
     cmd: python -m src.modeling.phase_3_training --model random_forest --train 
@@ -145,16 +145,16 @@ stages:
       size: 3767442
     - path: src/config.py
       hash: md5
-      md5: fb90983f21b747c08f9a393e277069ec
-      size: 1244
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
     - path: src/data/preprocess.py
       hash: md5
-      md5: 201952537abdef4eab91753dbf219197
-      size: 7005
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     params:
       params.yaml:
         data.label_col: label
@@ -164,7 +164,7 @@ stages:
     outs:
     - path: models/random_forest.joblib
       hash: md5
-      md5: 5abd09e33cf1d5c32ad04394acc1e1c1
+      md5: d8ed4b40e27941858567ce3dbc57e5aa
       size: 20410386
   clean:
     cmd: python -m src.data.phase_1_cleaning --input 
@@ -178,12 +178,12 @@ stages:
       size: 3130581
     - path: src/data/phase_1_cleaning.py
       hash: md5
-      md5: 6fa37c4dd1b1b2d747b7778f5a86e36a
-      size: 3311
+      md5: 4335cc7af36cf79d04223c648e029f7e
+      size: 3218
     - path: src/data/preprocess.py
       hash: md5
-      md5: 201952537abdef4eab91753dbf219197
-      size: 7005
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
     params:
       params.yaml:
         data:
@@ -209,16 +209,16 @@ stages:
       size: 985012
     - path: models/logreg.joblib
       hash: md5
-      md5: 0f4e3426f72d5fd7d1f895bd60235922
+      md5: 9c5d4c49f63f5ac4145c34ebc82efa4c
       size: 134481
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     - path: src/modeling/phase_4_evaluation.py
       hash: md5
-      md5: 1b5535f2f6e951a1a0147a26dc4ae93f
-      size: 1493
+      md5: da2d5021f8e5ca76f94af56365f0260f
+      size: 1451
     params:
       params.yaml:
         data.label_col: label
@@ -232,16 +232,16 @@ stages:
       size: 985012
     - path: models/naive_bayes.joblib
       hash: md5
-      md5: 37e1d4e52e8c2519b5465f49dfc7de87
+      md5: 25f0bba00f3b8f82c6634c273179723b
       size: 206521
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     - path: src/modeling/phase_4_evaluation.py
       hash: md5
-      md5: 1b5535f2f6e951a1a0147a26dc4ae93f
-      size: 1493
+      md5: da2d5021f8e5ca76f94af56365f0260f
+      size: 1451
     params:
       params.yaml:
         data.label_col: label
@@ -255,16 +255,16 @@ stages:
       size: 985012
     - path: models/linear_svm.joblib
       hash: md5
-      md5: f51cf400850f101500088636b457a622
+      md5: f40c802f678eb5eec68032ec4ce902c4
       size: 134365
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     - path: src/modeling/phase_4_evaluation.py
       hash: md5
-      md5: 1b5535f2f6e951a1a0147a26dc4ae93f
-      size: 1493
+      md5: da2d5021f8e5ca76f94af56365f0260f
+      size: 1451
     params:
       params.yaml:
         data.label_col: label
@@ -278,16 +278,16 @@ stages:
       size: 985012
     - path: models/random_forest.joblib
       hash: md5
-      md5: 5abd09e33cf1d5c32ad04394acc1e1c1
+      md5: d8ed4b40e27941858567ce3dbc57e5aa
       size: 20410386
     - path: src/modeling/phase_3_training.py
       hash: md5
-      md5: 2388bb52e8443f5b5f4b6ca6056a110c
-      size: 4699
+      md5: 814a396e1af468808b40ee7bc94d7f92
+      size: 4572
     - path: src/modeling/phase_4_evaluation.py
       hash: md5
-      md5: 1b5535f2f6e951a1a0147a26dc4ae93f
-      size: 1493
+      md5: da2d5021f8e5ca76f94af56365f0260f
+      size: 1451
     params:
       params.yaml:
         data.label_col: label
@@ -304,20 +304,20 @@ stages:
       size: 399
     - path: gx/expectations/processed_spam_dataset_suite.json
       hash: md5
-      md5: 4a8832ebbfeffbc19f5a49180924f1d1
+      md5: 0e23ea4deb9fb2af46c2d4a6a298dc6e
       size: 8696
     - path: gx/great_expectations.yml
       hash: md5
-      md5: 476b0b09625275d7ee694aec00de794c
+      md5: c0707831cae2c90056209e06dcc11a39
       size: 1890
     - path: gx/validation_definitions/processed_spam_dataset_validation.json
       hash: md5
-      md5: 4f5ab83452db28c04328f660dac39868
+      md5: b579941c695c1b2d3a92b62c0c4038de
       size: 553
     - path: src/data/gx_context_configuration.py
       hash: md5
-      md5: 49f7ba457d60fc2b3ba4aef3f1dc5796
-      size: 5757
+      md5: 9d6fcd18eeffca5580662db8b731ada1
+      size: 5590
     outs:
     - path: data/processed/gx_validation.json
       hash: md5
