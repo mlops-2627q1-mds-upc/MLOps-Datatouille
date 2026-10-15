@@ -1,7 +1,7 @@
 """Phase 3 of the pipeline: training and hyperparameter tuning with Hydra, Optuna, and MLflow.
 
 Usage (orchestrated by DVC):
-    python -m src.modeling.train model=logreg
+    python -m src.modeling.phase_3_training model=logreg
 """
 import logging
 from pathlib import Path
@@ -33,7 +33,9 @@ TEXT_COL = "clean_text"
 SCORING = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 
 
-def get_classifier(name: str, trial: optuna.Trial, model_cfg: DictConfig, random_state: int = 42) -> Any:
+def get_classifier(
+        name: str, trial: optuna.Trial, model_cfg: DictConfig, random_state: int = 42
+) -> Any:
     """Instantiate a classifier with hyperparameters sampled from Optuna.
     
     Args:
@@ -50,20 +52,31 @@ def get_classifier(name: str, trial: optuna.Trial, model_cfg: DictConfig, random
     """
     if name == "logreg":
         c_val = trial.suggest_float("C", model_cfg.C.low, model_cfg.C.high, log=model_cfg.C.log)
-        return LogisticRegression(C=c_val, max_iter=1000, class_weight="balanced", random_state=random_state)
+        return LogisticRegression(
+            C=c_val, max_iter=1000, class_weight="balanced", random_state=random_state
+        )
     elif name == "naive_bayes":
-        alpha = trial.suggest_float("alpha", model_cfg.alpha.low, model_cfg.alpha.high, log=model_cfg.alpha.log)
+        alpha = trial.suggest_float(
+            "alpha", model_cfg.alpha.low, model_cfg.alpha.high, log=model_cfg.alpha.log
+        )
         return MultinomialNB(alpha=alpha)
     elif name == "linear_svm":
         c_val = trial.suggest_float("C", model_cfg.C.low, model_cfg.C.high, log=model_cfg.C.log)
         return LinearSVC(C=c_val, class_weight="balanced", random_state=random_state)
     elif name == "random_forest":
-        n_estimators = trial.suggest_int("n_estimators", model_cfg.n_estimators.low, model_cfg.n_estimators.high)
+        n_estimators = trial.suggest_int(
+            "n_estimators", model_cfg.n_estimators.low, model_cfg.n_estimators.high
+        )
         return RandomForestClassifier(
-            n_estimators=n_estimators, class_weight="balanced", random_state=random_state, n_jobs=-1
+            n_estimators=n_estimators, 
+            class_weight="balanced", 
+            random_state=random_state, 
+            n_jobs=-1
         )
     else:
-        raise ValueError(f"Unknown model '{name}'. Options: logreg, naive_bayes, linear_svm, random_forest")
+        raise ValueError(
+            f"Unknown model '{name}'. Options: logreg, naive_bayes, linear_svm, random_forest"
+        )
 
 
 def get_count_columns(df: pd.DataFrame) -> List[str]:
@@ -78,13 +91,13 @@ def get_count_columns(df: pd.DataFrame) -> List[str]:
     return [col for col in df.columns if col.startswith("n_")]
 
 
-def load_xy(path, label_col):
+def load_xy(path: str, label_col: str) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
     """Load a CSV file and separate it into training features (X) and target array (y).
-    
+
     Args:
         path: File path to the CSV dataset.
         label_col: Exact string name of the target class column.
-        
+
     Returns:
         Tuple containing the feature DataFrame (X), target Series (y), and count column names.
     """
@@ -110,7 +123,9 @@ def train_and_evaluate(
     """
     def objective(trial: optuna.Trial) -> float:
         with mlflow.start_run(run_name=f"trial_{trial.number}", nested=True):
-            classifier = get_classifier(cfg.model.name, trial, cfg.model.search_space, cfg.train.random_state)
+            classifier = get_classifier(
+                cfg.model.name, trial, cfg.model.search_space, cfg.train.random_state
+            )
 
             features = ColumnTransformer(
                 [
@@ -119,12 +134,16 @@ def train_and_evaluate(
                 ]
             )
             pipeline = Pipeline([("features", features), ("classifier", classifier)])
-            cv = StratifiedKFold(n_splits=cfg.train.cv_folds, shuffle=True, random_state=cfg.train.random_state)
+            cv = StratifiedKFold(
+                n_splits=cfg.train.cv_folds, shuffle=True, random_state=cfg.train.random_state
+            )
 
             with track_emissions(f"train_trial_{cfg.model.name}"):
                 scores = cross_validate(pipeline, X, y, cv=cv, scoring=SCORING)
 
-            metrics = {f"cv_{name}": round(float(scores[f"test_{name}"].mean()), 4) for name in SCORING}
+            metrics = {
+                f"cv_{name}": round(float(scores[f"test_{name}"].mean()), 4) for name in SCORING
+            }
             metrics["cv_f1_macro_std"] = round(float(scores["test_f1_macro"].std()), 4)
             
             mlflow.log_params(trial.params)
@@ -139,8 +158,9 @@ def train_and_evaluate(
         mlflow.log_metric("best_cv_f1_macro", study.best_value)
 
         best_trial = optuna.trial.FixedTrial(study.best_params)
-        best_classifier = get_classifier(cfg.model.name, 
-            best_trial, cfg.model.search_space, cfg.train.random_state)
+        best_classifier = get_classifier(
+            cfg.model.name, best_trial, cfg.model.search_space, cfg.train.random_state
+        )
 
         features = ColumnTransformer(
             [
