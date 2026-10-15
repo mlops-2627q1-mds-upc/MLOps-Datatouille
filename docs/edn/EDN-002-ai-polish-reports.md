@@ -1,6 +1,6 @@
 **Engineering Decision Notebook (EDN) — Entry**
 
-**Milestone:** Other (Transversal M1–M6)
+**Milestone:** Other (Transversal M1–M3)
 
 **Activity / Topic (optional):** Documentation
 
@@ -36,12 +36,6 @@
 
 [ ] Used as input for further analysis
 
-[ ] Other: ___________
+[ ] Other: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-**Assessment of the AI Contribution:** All AI edits are reviewed by the person writing the report. Most of the suggestions are accepted with modifications to ensure accuracy and maintain the intended meaning.
-
-**AI Interaction Evidence (optional):**
-
-Prompt pattern: `Improve tone and clarity. Do not change facts or add content: <paste team paragraph>`
-
-**Other Evidence (optional):** `docs/proposals/`, `reports/`.
+**Assessment of the AI Contribution:** All AI edits are reviewed by the person writing the report. Most of the suggestions are accepted with modifications to ensure language precision and maintaining the intended meaning.
