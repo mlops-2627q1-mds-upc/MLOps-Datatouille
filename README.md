@@ -79,13 +79,15 @@ Great Expectations itself is configured under `gx/` and
 `src/data/gx_context_configuration.py`. The DVC `validate_processed` stage runs its
 checkpoint against the cleaned dataset and writes the validation report.
 The checkpoint checks the exact column names/order, non-empty text columns,
-string types for text and labels, the allowed label values, and non-null,
-non-negative integer count features.
+string types for text and labels, the allowed label values, non-null and
+non-negative integer count features, and the absence of email addresses and
+phone numbers in the text column.
 
 Separately, `tests/integration/gx_expectations_test.py` contains **pytest tests for Great
 Expectations**. These tests check the existing rules against the real processed
 dataset and verify that they accept valid sample data and reject invalid labels,
-null cleaned text, and negative count features. They test Great Expectations; they
+null cleaned text, negative count features, and text containing email addresses
+or phone numbers. They test Great Expectations; they
 do not replace or redefine its configuration. They are standalone tests and are
 not part of the DVC pipeline. Run them separately with
 `pytest -q tests/integration/gx_expectations_test.py`.
