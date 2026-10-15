@@ -283,8 +283,8 @@ stages:
       size: 6356995
     - path: src/data/gx_context_configuration.py
       hash: md5
-      md5: 3624b9e25768914f4a22c9ee64b9f647
-      size: 5582
+      md5: f053ca1669833a2f1fa60fbce9cf56f3
+      size: 5276
     outs:
     - path: data/processed/gx_validation.json
       hash: md5
@@ -296,8 +296,8 @@ stages:
     deps:
     - path: src/download_dataset.py
       hash: md5
-      md5: cbd8bbe7440926eb05c074ace86454b0
-      size: 1499
+      md5: 463392979eeb0476828e9f4bc8d03420
+      size: 1504
     params:
       params.yaml:
         data.hf_id: diegovelilla/email-classification-dataset

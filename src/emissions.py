@@ -19,7 +19,11 @@ from src.config import (
 EMISSIONS_FILE = "emissions.csv"
 
 
-def build_tracker(stage: str, output_dir: Path = EMISSIONS_DIR) -> OfflineEmissionsTracker:
+def build_tracker(
+    stage: str,
+    output_dir: Path = EMISSIONS_DIR,
+    measure_power_secs: float | None = None,
+) -> OfflineEmissionsTracker:
     """Create an offline CodeCarbon tracker for one pipeline stage.
 
     Args:
@@ -27,6 +31,9 @@ def build_tracker(stage: str, output_dir: Path = EMISSIONS_DIR) -> OfflineEmissi
             It is stored in the `project_name` column of the CSV as
             `<CODECARBON_PROJECT_NAME>-<stage>`.
         output_dir: Directory where `emissions.csv` is appended.
+        measure_power_secs: Power sampling interval. Defaults to
+            `CODECARBON_MEASURE_POWER_SECS`. Override (e.g. 1 s) for short
+            experiments where the default interval yields too few readings.
 
     Returns:
         A configured, not yet started, tracker.
@@ -35,7 +42,9 @@ def build_tracker(stage: str, output_dir: Path = EMISSIONS_DIR) -> OfflineEmissi
     return OfflineEmissionsTracker(
         project_name=f"{CODECARBON_PROJECT_NAME}-{stage}",
         country_iso_code=CODECARBON_COUNTRY_ISO_CODE,
-        measure_power_secs=CODECARBON_MEASURE_POWER_SECS,
+        measure_power_secs=CODECARBON_MEASURE_POWER_SECS
+        if measure_power_secs is None
+        else measure_power_secs,
         tracking_mode=CODECARBON_TRACKING_MODE,
         output_dir=str(output_dir),
         output_file=EMISSIONS_FILE,
@@ -76,7 +85,9 @@ def _log_to_mlflow(stage: str, summary: dict[str, float], csv_path: Path) -> Non
 
 @contextmanager
 def track_emissions(
-    stage: str, output_dir: Path = EMISSIONS_DIR
+    stage: str,
+    output_dir: Path = EMISSIONS_DIR,
+    measure_power_secs: float | None = None,
 ) -> Iterator[OfflineEmissionsTracker]:
     """Measure energy and CO2 of the wrapped block and record the result.
 
@@ -86,11 +97,13 @@ def track_emissions(
     Args:
         stage: Pipeline stage name (e.g. "features", "train", "predict").
         output_dir: Directory where `emissions.csv` is appended.
+        measure_power_secs: Power sampling interval override. Defaults to
+            `CODECARBON_MEASURE_POWER_SECS`.
 
     Yields:
         The running tracker (useful for `start_task` / `stop_task`).
     """
-    tracker = build_tracker(stage, output_dir)
+    tracker = build_tracker(stage, output_dir, measure_power_secs)
     tracker.start()
     try:
         yield tracker
