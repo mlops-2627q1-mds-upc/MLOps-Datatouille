@@ -19,8 +19,6 @@ python-dotenv
 ruff==0.16.9
 tqdm
 typer
-transformers==5.19.0
-torch==2.12.0
 fastapi
 httpx
 -e .

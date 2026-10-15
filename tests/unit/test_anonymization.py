@@ -1,48 +1,39 @@
-"""Unit tests for named-entity anonymization in phase-one cleaning."""
+"""Unit tests for email and phone-number anonymization."""
 
 import pytest
 
-from src.data import phase_1_cleaning
+from src.data import preprocess as pp
 
 
-def test_anonymize_replaces_multiple_entities_from_right_to_left(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test of replacing multiple named entities without shifting later spans."""
-    entities = [
-        {"start": 0, "end": 5, "entity_group": "PER"},
-        {"start": 10, "end": 14, "entity_group": "ORG"},
-        {"start": 18, "end": 23, "entity_group": "LOC"},
-    ]
-
-    def fake_ner_pipeline(model_name: str):
-        return lambda text: entities
-
-    monkeypatch.setattr(phase_1_cleaning, "_get_ner_pipeline", fake_ner_pipeline)
-    result = phase_1_cleaning.anonimitzar_amb_ia("Alice met Acme in Paris")
-    assert result == "[PER] met [ORG] in [LOC]"
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("Write to john.doe@gmail.com today", "Write to xxemail today"),
+        ("Call +34 612 345 678 now", "Call xxphone now"),
+        ("Call (555) 123-4567 now", "Call xxphone now"),
+        ("Tel:612345678", "Tel: xxphone"),
+    ],
+)
+def test_anonymize_text_replaces_contact_details(text, expected):
+    """Test of replacing email addresses and phone numbers with placeholder tokens."""
+    assert pp.remove_whitespace(pp.anonymize_text(text)) == expected
 
 
-def test_anonymize_leaves_text_unchanged_when_no_entities_are_detected(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test of leaving the input unchanged when the NER model finds no entities."""
-    monkeypatch.setattr(phase_1_cleaning, "_get_ner_pipeline", lambda model_name: lambda text: [])
-    text = "The meeting starts tomorrow."
-    assert phase_1_cleaning.anonimitzar_amb_ia(text) == text
+def test_anonymize_text_keeps_dates_and_short_numbers():
+    """Test of leaving dates, times and short numbers unchanged."""
+    text = "Meeting on 2026-10-15 at 10:30 in room 42"
+    assert pp.anonymize_text(text) == text
 
 
-def test_anonymize_propagates_ner_inference_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test of propagating NER inference errors instead of returning unredacted text."""
+def test_anonymize_text_leaves_text_without_contact_details_unchanged():
+    """Test of returning the input unchanged when it has no contact details."""
+    text = "Win a free prize now!"
+    assert pp.anonymize_text(text) == text
 
-    def fail_to_infer(model_name: str):
-        def infer(text: str):
-            raise RuntimeError("NER inference failed")
-        return infer
 
-    monkeypatch.setattr(phase_1_cleaning, "_get_ner_pipeline", fail_to_infer)
-
-    with pytest.raises(RuntimeError, match="NER inference failed"):
-        phase_1_cleaning.anonimitzar_amb_ia("Alice visited Paris")
+def test_anonymization_tokens_survive_text_cleaning():
+    """Test of preserving the placeholder tokens through full text cleaning."""
+    anonymized = pp.anonymize_text("Write to john@spam.com or phone 612345678")
+    tokens = pp.clean_text(anonymized).split()
+    assert "xxemail" in tokens
+    assert "xxphone" in tokens

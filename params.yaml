@@ -6,7 +6,6 @@ data:
   encoding: utf-8
   emojis_as_text: false
   anonymize: true
-  ner_model: Davlan/bert-base-multilingual-cased-ner-hrl
 
 split:
   train: data/dataset/train.csv

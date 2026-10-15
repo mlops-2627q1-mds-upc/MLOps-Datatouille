@@ -6,9 +6,9 @@ which runs in the DVC ``validate_processed`` stage.
 """
 
 import great_expectations as gx
+from great_expectations import ValidationDefinition
 import pandas as pd
 import pytest
-from great_expectations import ValidationDefinition
 from pytest import fixture
 
 from src.data.gx_context_configuration import (
@@ -72,6 +72,8 @@ def test_configured_expectations_accept_valid_processed_dataframe():
         ("label", "unknown", "expect_column_values_to_be_in_set"),
         ("clean_text", None, "expect_column_values_to_not_be_null"),
         ("n_urls", -1, "expect_column_values_to_be_between"),
+        ("text", "Mail john@spam.com now", "expect_column_values_to_not_match_regex"),
+        ("text", "Call 612 345 678 now", "expect_column_values_to_not_match_regex"),
     ],
 )
 def test_configured_expectations_reject_invalid_processed_data(

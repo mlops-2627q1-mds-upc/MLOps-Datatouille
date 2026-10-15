@@ -67,13 +67,13 @@ Unit tests for preprocessing, data splitting, and anonymization are grouped in
 `tests/integration/`. Run the complete test tree separately with `pytest -q tests`.
 Pytest tests are not part of the DVC pipeline.
 
-Phase-one cleaning can also anonymize named entities before count features and text
-normalization. This is enabled for the DVC `clean` stage by `data.anonymize: true`
-in `params.yaml`; the Hugging Face NER model is selected by `data.ner_model`.
+Phase-one cleaning can also anonymize contact details before count features and text
+normalization. Email addresses are replaced with `xxemail` and phone numbers with
+`xxphone`, using the regular expressions defined in `src/data/preprocess.py`. This is
+enabled for the DVC `clean` stage by `data.anonymize: true` in `params.yaml`.
 The anonymization unit tests are in `tests/unit/test_anonymization.py`, and the
 phase-one integration test is in `tests/integration/test_preprocess_integration.py`.
-Run these tests separately with pytest. The NER model is loaded only if
-anonymization is enabled; it may need to be downloaded on the first pipeline run.
+Run these tests separately with pytest.
 
 Great Expectations itself is configured under `gx/` and
 `src/data/gx_context_configuration.py`. The DVC `validate_processed` stage runs its

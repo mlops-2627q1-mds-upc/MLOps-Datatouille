@@ -9,7 +9,6 @@ stages:
       --encoding ${data.encoding}
       --emojis-as-text ${data.emojis_as_text}
       --anonymize ${data.anonymize}
-      --ner-model ${data.ner_model}
     deps:
       - ${data.raw}
       - src/data/preprocess.py

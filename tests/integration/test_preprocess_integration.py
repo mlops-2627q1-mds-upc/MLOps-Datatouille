@@ -85,24 +85,12 @@ def test_dataframe_cleaning_with_emoji_conversion_and_custom_output():
     assert result["label"].tolist() == ["spam", "ham"]
 
 
-def test_phase_one_anonymizes_before_counting_and_cleaning(monkeypatch):
-    """Test of integrating NER anonymization into the complete phase-one preprocessing flow."""
-    def fake_ner_pipeline(model_name):
-        def infer(text):
-            if text == "Alice met Acme in Paris.":
-                return [
-                    {"start": 0, "end": 5, "entity_group": "PER"},
-                    {"start": 10, "end": 14, "entity_group": "ORG"},
-                    {"start": 18, "end": 23, "entity_group": "LOC"},
-                ]
-            return []
-
-        return infer
-
-    monkeypatch.setattr(phase_1_cleaning, "_get_ner_pipeline", fake_ner_pipeline)
+def test_phase_one_anonymizes_before_counting_and_cleaning():
+    """Test of integrating contact-detail anonymization into the complete phase-one flow."""
+    original = "Write to john.doe@gmail.com or phone 612 345 678."
     raw = pd.DataFrame(
         {
-            "text": ["Alice met Acme in Paris.", "The meeting starts tomorrow."],
+            "text": [original, "The meeting starts tomorrow."],
             "label": ["spam", "not_spam"],
         }
     )
@@ -114,9 +102,17 @@ def test_phase_one_anonymizes_before_counting_and_cleaning(monkeypatch):
         anonymize=True,
     )
 
-    assert result.loc[0, "text"] == "[PER] met [ORG] in [LOC]."
-    assert result.loc[0, "clean_text"] == "met org loc"
-    assert result.loc[0, "n_words"] == 5
-    assert result.loc[0, "n_uppercase"] == 9
-    assert not result["text"].str.contains(r"Alice|Acme|Paris").any()
-    assert raw.loc[0, "text"] == "Alice met Acme in Paris."
+    assert result.loc[0, "text"].split() == [
+        "Write",
+        "to",
+        "xxemail",
+        "or",
+        "phone",
+        "xxphone",
+        ".",
+    ]
+    assert {"xxemail", "xxphone"} <= set(result.loc[0, "clean_text"].split())
+    assert result.loc[0, "n_uppercase"] == 1
+    assert result.loc[0, "n_punctuation"] == 1
+    assert not result["text"].str.contains(r"@|612", regex=True).any()
+    assert raw.loc[0, "text"] == original
