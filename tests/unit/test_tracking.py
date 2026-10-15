@@ -1,0 +1,127 @@
+"""Unit tests for the MLflow tracking helpers of the training stage."""
+import hashlib
+import json
+from pathlib import Path
+
+import mlflow
+from mlflow.tracking import MlflowClient
+import pytest
+
+from src.modeling.phase_3_training import save_metrics
+from src.modeling.tracking import (
+    EXP_REF_TAG,
+    NOTE_TAG,
+    RUN_ROLE_TAG,
+    build_exp_ref,
+    build_exp_tags,
+    build_run_name,
+    file_md5,
+    start_training_run,
+)
+
+EXPERIMENT = "test-experiment"
+
+
+@pytest.fixture
+def tracking_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Point MLflow to a throwaway local store and clear DVC experiment env vars."""
+    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", uri)
+    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
+    monkeypatch.delenv("DVC_EXP_BASELINE_REV", raising=False)
+    mlflow.set_tracking_uri(uri)
+    yield uri
+    mlflow.set_tracking_uri(None)
+
+
+def _runs(uri: str) -> list:
+    """Return all runs of the test experiment."""
+    client = MlflowClient(uri)
+    experiment = client.get_experiment_by_name(EXPERIMENT)
+    return client.search_runs([experiment.experiment_id])
+
+
+def test_build_run_name_with_and_without_prefix() -> None:
+    """Run names get the DVC experiment prefix only when there is one."""
+    assert build_run_name("exp-1", "logreg") == "exp-1-logreg"
+    assert build_run_name(None, "logreg") == "logreg"
+
+
+def test_build_exp_ref_matches_dvc_format() -> None:
+    """The git ref follows DVC's refs/exps/<sha[:2]>/<sha[2:]>/<name> layout."""
+    assert build_exp_ref("my-exp", "abc123") == "refs/exps/ab/c123/my-exp"
+
+
+def test_build_exp_tags_include_restore_info() -> None:
+    """Tags hold the exp ref and a note with the restore commands."""
+    tags = build_exp_tags("my-exp", "abc123", "child")
+    assert tags[EXP_REF_TAG] == "refs/exps/ab/c123/my-exp"
+    assert "dvc exp pull origin my-exp" in tags[NOTE_TAG]
+    assert "dvc exp apply my-exp" in tags[NOTE_TAG]
+
+
+def test_build_exp_tags_without_baseline_rev() -> None:
+    """Without a baseline commit there is no exp ref, but the restore note is kept."""
+    tags = build_exp_tags("my-exp", None, "parent")
+    assert EXP_REF_TAG not in tags
+    assert "dvc exp apply my-exp" in tags[NOTE_TAG]
+
+
+def test_file_md5_matches_hashlib(tmp_path: Path) -> None:
+    """The dataset hash matches hashlib's MD5 of the file content."""
+    path = tmp_path / "data.csv"
+    path.write_bytes(b"text,label\nhi,ham\n")
+    assert file_md5(path) == hashlib.md5(b"text,label\nhi,ham\n").hexdigest()
+
+
+def test_save_metrics_writes_json(tmp_path: Path) -> None:
+    """Metrics are written as JSON, creating missing parent directories."""
+    path = tmp_path / "nested" / "metrics.json"
+    save_metrics({"cv_f1_macro": 0.9}, path)
+    assert json.loads(path.read_text()) == {"cv_f1_macro": 0.9}
+
+
+def test_runs_share_one_parent_under_dvc_exp(
+    tracking_uri: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """All models of one DVC experiment log child runs under a single parent."""
+    monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
+    monkeypatch.setenv("DVC_EXP_BASELINE_REV", "abc123")
+
+    for model in ("logreg", "naive_bayes"):
+        with start_training_run(model, EXPERIMENT):
+            mlflow.log_metric("cv_f1_macro", 0.9)
+
+    runs = _runs(tracking_uri)
+    parents = [r for r in runs if r.data.tags[RUN_ROLE_TAG] == "parent"]
+    children = [r for r in runs if r.data.tags[RUN_ROLE_TAG] == "child"]
+    assert len(parents) == 1
+    assert parents[0].info.run_name == "my-exp-train"
+    assert parents[0].info.status == "FINISHED"
+    assert sorted(r.info.run_name for r in children) == ["my-exp-logreg", "my-exp-naive_bayes"]
+    assert {r.data.tags["mlflow.parentRunId"] for r in children} == {parents[0].info.run_id}
+    assert {r.data.tags[EXP_REF_TAG] for r in runs} == {"refs/exps/ab/c123/my-exp"}
+
+
+def test_new_dvc_exp_gets_new_parent(
+    tracking_uri: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each DVC experiment gets its own parent run."""
+    for exp_name in ("exp-a", "exp-b"):
+        monkeypatch.setenv("DVC_EXP_NAME", exp_name)
+        with start_training_run("logreg", EXPERIMENT):
+            pass
+
+    parents = [r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "parent"]
+    assert sorted(r.info.run_name for r in parents) == ["exp-a-train", "exp-b-train"]
+
+
+def test_standalone_run_outside_dvc_exp(tracking_uri: str) -> None:
+    """Outside dvc exp run, a standalone run named after the model is logged."""
+    with start_training_run("logreg", EXPERIMENT):
+        pass
+
+    runs = _runs(tracking_uri)
+    assert len(runs) == 1
+    assert runs[0].info.run_name == "logreg"
+    assert "mlflow.parentRunId" not in runs[0].data.tags
