@@ -7,7 +7,7 @@ Steps:
     4. Remove duplicates on the cleaned text.
 
 Usage (from the root of the repo):
-    python -m src.data.phase_1_cleaning \
+    python -m src.data.cleaning \
         --input data/raw/daisy_dataset_spam_detection.csv --output data/processed/clean.csv
 """
 

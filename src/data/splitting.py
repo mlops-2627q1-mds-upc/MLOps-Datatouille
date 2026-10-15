@@ -3,7 +3,7 @@
 The split is stratified by the label and reproducible (random_state).
 
 Usage (from the root of the repo):
-    python -m src.data.phase_2_splitting --input data/processed/clean.csv \
+    python -m src.data.splitting --input data/processed/clean.csv \
         --train data/dataset/train.csv --test data/dataset/test.csv
 """
 

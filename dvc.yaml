@@ -1,7 +1,7 @@
 stages:
   clean:
     cmd: >-
-      python -m src.data.phase_1_cleaning
+      python -m src.data.cleaning
       --input ${data.raw}
       --output ${data.clean}
       --text-col ${data.text_col}
@@ -11,7 +11,7 @@ stages:
     deps:
       - ${data.raw}
       - src/data/preprocess.py
-      - src/data/phase_1_cleaning.py
+      - src/data/cleaning.py
     params:
       - data
     outs:
@@ -31,7 +31,7 @@ stages:
 
   split:
     cmd: >-
-      python -m src.data.phase_2_splitting
+      python -m src.data.splitting
       --input ${data.clean}
       --train ${split.train}
       --test ${split.test}
@@ -42,7 +42,7 @@ stages:
       - ${data.clean}
       - data/processed/gx_validation.json
       - src/data/split_data.py
-      - src/data/phase_2_splitting.py
+      - src/data/splitting.py
     params:
       - split
       - data.label_col
@@ -54,7 +54,7 @@ stages:
     foreach: ${train.models}
     do:
       cmd: >-
-        python -m src.modeling.phase_3_training
+        python -m src.modeling.train
         model=${item}
         data.train=${split.train}
         data.label_col=${data.label_col}
@@ -65,7 +65,7 @@ stages:
       deps:
         - ${split.train}
         - src/data/preprocess.py
-        - src/modeling/phase_3_training.py
+        - src/modeling/train.py
         - conf/train.yaml
         - conf/model/${item}.yaml
       params:
@@ -80,14 +80,14 @@ stages:
     foreach: ${train.models}
     do:
       cmd: >-
-        python -m src.modeling.phase_4_evaluation
+        python -m src.modeling.evaluation
         --model-path models/${item}.joblib
         --test ${split.test}
         --label-col ${data.label_col}
       deps:
         - models/${item}.joblib
         - ${split.test}
-        - src/modeling/phase_3_training.py
-        - src/modeling/phase_4_evaluation.py
+        - src/modeling/train.py
+        - src/modeling/evaluation.py
       params:
         - data.label_col
