@@ -26,6 +26,9 @@ def processed_data_validator() -> ValidationDefinition:
 
 
 def test_processed_data(processed_data_validator: ValidationDefinition):
+    """Test of validating the real processed dataset produced by the DVC pipeline."""
+    if not (ROOT_DIR / "data" / "processed" / "clean.csv").exists():
+        pytest.skip("data/processed/clean.csv not found; run `dvc pull` or `dvc repro` first")
     validation_result = processed_data_validator.run(result_format="BOOLEAN_ONLY")
     expectations_failed = validation_result["statistics"]["unsuccessful_expectations"]
     assert expectations_failed == 0, f"There were {expectations_failed} failing expectations."
@@ -81,7 +84,7 @@ def test_configured_expectations_reject_invalid_processed_data(
     invalid_value: object,
     expected_expectation: str,
 ):
-    """Test of rejecting invalid labels, null cleaned text, and negative count features."""
+    """Test of rejecting invalid labels, null text, negative counts, and contact details."""
     dataframe = _valid_processed_dataframe()
     dataframe.loc[0, column] = invalid_value
 

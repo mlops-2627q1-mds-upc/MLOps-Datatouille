@@ -22,6 +22,14 @@ LABEL_COLUMN = "label"
 if MODEL_NAME not in MODEL_NAMES:
     raise ValueError(f"Unknown MODEL_NAME {MODEL_NAME!r}; expected one of {sorted(MODEL_NAMES)}")
 
+MODEL_PATH = MODELS_DIR / f"{MODEL_NAME}.joblib"
+TEST_PATH = DATA_DIR / "dataset" / "test.csv"
+if not (MODEL_PATH.exists() and TEST_PATH.exists()):
+    pytest.skip(
+        f"{MODEL_PATH.name} or test.csv not found; run `dvc pull` or `dvc repro` first",
+        allow_module_level=True,
+    )
+
 
 @pytest.fixture(scope="module")
 def model() -> Pipeline:
