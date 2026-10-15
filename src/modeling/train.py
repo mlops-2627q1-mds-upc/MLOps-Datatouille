@@ -33,7 +33,7 @@ SCORING = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 
 
 def get_classifier(
-        name: str, trial: optuna.Trial, model_cfg: DictConfig, random_state: int = 42
+    name: str, trial: optuna.Trial, model_cfg: DictConfig, random_state: int = 42
 ) -> Any:
     """Instantiate a classifier with hyperparameters sampled from Optuna.
 
