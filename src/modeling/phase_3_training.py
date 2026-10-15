@@ -1,16 +1,18 @@
-"""Phase 3 of the pipeline: training of one classifier with cross-validation.
+"""Phase 3 of the pipeline: training and hyperparameter tuning with Hydra, Optuna, and MLflow.
 
-Usage (from the root of the repo):
-    python -m src.modeling.phase_3_training --model logreg \
-        --train data/dataset/train.csv --model-out models/logreg.joblib
+Usage (orchestrated by DVC):
+    python -m src.modeling.phase_3_training model=logreg
 """
-
-import argparse
 import logging
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
+import hydra
 import joblib
+import mlflow
+import optuna
 import pandas as pd
+from omegaconf import DictConfig
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -21,6 +23,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import LinearSVC
 
 from src.data.preprocess import make_tfidf
+from src.emissions import track_emissions
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -29,46 +33,61 @@ TEXT_COL = "clean_text"
 SCORING = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 
 
-def get_classifier(name, random_state=42):
-    """Returns the classifier corresponding to `name`."""
-    classifiers = {
-        "logreg": LogisticRegression(
-            max_iter=1000, class_weight="balanced", random_state=random_state
-        ),
-        "naive_bayes": MultinomialNB(),
-        "linear_svm": LinearSVC(class_weight="balanced", random_state=random_state),
-        "random_forest": RandomForestClassifier(
-            n_estimators=300, class_weight="balanced", random_state=random_state, n_jobs=-1
-        ),
-    }
-    if name not in classifiers:
-        raise ValueError(f"Unknown model '{name}'. Options: {sorted(classifiers)}")
-    return classifiers[name]
+def get_classifier(name: str, trial: optuna.Trial, model_cfg: DictConfig, random_state: int = 42) -> Any:
+    """Instantiate a classifier with hyperparameters sampled from Optuna.
+    
+    Args:
+        name: Name of the classifier algorithm.
+        trial: Optuna trial object for hyperparameter suggestion.
+        model_cfg: Hydra configuration dict containing the search space boundaries.
+        random_state: Random seed for deterministic reproducibility.
+        
+    Returns:
+        An instantiated scikit-learn classifier ready for training.
+        
+    Raises:
+        ValueError: If the specified model name is not supported.
+    """
+    if name == "logreg":
+        c_val = trial.suggest_float("C", model_cfg.C.low, model_cfg.C.high, log=model_cfg.C.log)
+        return LogisticRegression(C=c_val, max_iter=1000, class_weight="balanced", random_state=random_state)
+    elif name == "naive_bayes":
+        alpha = trial.suggest_float("alpha", model_cfg.alpha.low, model_cfg.alpha.high, log=model_cfg.alpha.log)
+        return MultinomialNB(alpha=alpha)
+    elif name == "linear_svm":
+        c_val = trial.suggest_float("C", model_cfg.C.low, model_cfg.C.high, log=model_cfg.C.log)
+        return LinearSVC(C=c_val, class_weight="balanced", random_state=random_state)
+    elif name == "random_forest":
+        n_estimators = trial.suggest_int("n_estimators", model_cfg.n_estimators.low, model_cfg.n_estimators.high)
+        return RandomForestClassifier(
+            n_estimators=n_estimators, class_weight="balanced", random_state=random_state, n_jobs=-1
+        )
+    else:
+        raise ValueError(f"Unknown model '{name}'. Options: logreg, naive_bayes, linear_svm, random_forest")
 
 
-def get_count_columns(df):
-    """Returns the count columns generated in phase 1 (n_words, n_emojis...)."""
+def get_count_columns(df: pd.DataFrame) -> List[str]:
+    """Identify the count columns generated during Phase 1 preprocessing.
+    
+    Args:
+        df: The processed feature dataset.
+        
+    Returns:
+        List of column names prefixed with 'n_'.
+    """
     return [col for col in df.columns if col.startswith("n_")]
 
 
-def build_pipeline(model_name, count_columns, max_features=3000, random_state=42):
-    """Builds the complete Pipeline: features + classifier."""
-    features = ColumnTransformer(
-        [
-            ("tfidf", make_tfidf(max_features), TEXT_COL),
-            ("counts", MinMaxScaler(), count_columns),
-        ]
-    )
-    return Pipeline(
-        [
-            ("features", features),
-            ("classifier", get_classifier(model_name, random_state)),
-        ]
-    )
-
-
 def load_xy(path, label_col):
-    """Loads a CSV file and separates it into features (X) and target (y)."""
+    """Load a CSV file and separate it into training features (X) and target array (y).
+    
+    Args:
+        path: File path to the CSV dataset.
+        label_col: Exact string name of the target class column.
+        
+    Returns:
+        Tuple containing the feature DataFrame (X), target Series (y), and count column names.
+    """
     df = pd.read_csv(path)
     df[TEXT_COL] = df[TEXT_COL].fillna("").astype(str)
     count_columns = get_count_columns(df)
@@ -76,51 +95,81 @@ def load_xy(path, label_col):
 
 
 def train_and_evaluate(
-    model_name, X, y, count_columns, max_features=3000, cv_folds=5, random_state=42
-):
-    """Performs cross-validation on train data and final training with all train data."""
-    pipeline = build_pipeline(model_name, count_columns, max_features, random_state)
+    cfg: DictConfig, X: pd.DataFrame, y: pd.Series, count_columns: List[str]
+) -> Tuple[Pipeline, Dict[str, float]]:
+    """Execute Optuna hyperparameter study, log via MLflow, and train the final global pipeline.
+    
+    Args:
+        cfg: The combined Hydra configuration dictionary.
+        X: Feature dataset.
+        y: Target labels.
+        count_columns: List of metadata count features for the numerical scaler.
+        
+    Returns:
+        Tuple containing the optimal fitted Pipeline and its final cross-validation metrics.
+    """
+    def objective(trial: optuna.Trial) -> float:
+        with mlflow.start_run(run_name=f"trial_{trial.number}", nested=True):
+            classifier = get_classifier(cfg.model.name, trial, cfg.model.search_space, cfg.train.random_state)
 
-    cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
-    scores = cross_validate(pipeline, X, y, cv=cv, scoring=SCORING)
-    metrics = {f"cv_{name}": round(float(scores[f"test_{name}"].mean()), 4) for name in SCORING}
-    metrics["cv_f1_macro_std"] = round(float(scores["test_f1_macro"].std()), 4)
+            features = ColumnTransformer(
+                [
+                    ("tfidf", make_tfidf(cfg.train.max_features), TEXT_COL),
+                    ("counts", MinMaxScaler(), count_columns),
+                ]
+            )
+            pipeline = Pipeline([("features", features), ("classifier", classifier)])
+            cv = StratifiedKFold(n_splits=cfg.train.cv_folds, shuffle=True, random_state=cfg.train.random_state)
 
-    pipeline.fit(X, y)
-    return pipeline, metrics
+            with track_emissions(f"train_trial_{cfg.model.name}"):
+                scores = cross_validate(pipeline, X, y, cv=cv, scoring=SCORING)
 
+            metrics = {f"cv_{name}": round(float(scores[f"test_{name}"].mean()), 4) for name in SCORING}
+            metrics["cv_f1_macro_std"] = round(float(scores["test_f1_macro"].std()), 4)
+            
+            mlflow.log_params(trial.params)
+            mlflow.log_metrics(metrics)
+            return metrics["cv_f1_macro"]
+            
+    with mlflow.start_run(run_name=f"optuna_search_{cfg.model_name}"):
+        study = optuna.create_study(direction="maximize")
+        study.optimize(objective, n_trials=cfg.train.n_trials)
 
-def main():
-    parser = argparse.ArgumentParser(description="Trains a model.")
-    parser.add_argument(
-        "--model", required=True, help="logreg | naive_bayes | linear_svm | random_forest"
-    )
-    parser.add_argument("--train", required=True, help="Train CSV")
-    parser.add_argument("--model-out", required=True, help="Output path of the model (.joblib)")
-    parser.add_argument("--label-col", default="label")
-    parser.add_argument("--max-features", type=int, default=3000)
-    parser.add_argument("--cv-folds", type=int, default=5)
-    parser.add_argument("--random-state", type=int, default=42)
-    args = parser.parse_args()
+        mlflow.log_params({"best_" + k: v for k, v in study.best_params.items()})
+        mlflow.log_metric("best_cv_f1_macro", study.best_value)
 
-    X, y, count_columns = load_xy(args.train, args.label_col)
-    logger.info("Training '%s' with %d rows", args.model, len(X))
+        best_trial = optuna.trial.FixedTrial(study.best_params)
+        best_classifier = get_classifier(cfg.model.name, 
+            best_trial, cfg.model.search_space, cfg.train.random_state)
 
-    pipeline, metrics = train_and_evaluate(
-        args.model,
-        X,
-        y,
-        count_columns,
-        max_features=args.max_features,
-        cv_folds=args.cv_folds,
-        random_state=args.random_state,
-    )
-    logger.info("Cross-validation metrics: %s", metrics)
+        features = ColumnTransformer(
+            [
+                ("tfidf", make_tfidf(cfg.train.max_features), TEXT_COL),
+                ("counts", MinMaxScaler(), count_columns),
+            ]
+        )
+        final_pipeline = Pipeline([("features", features), ("classifier", best_classifier)])
 
-    model_path = Path(args.model_out)
+        with track_emissions(f"train_final_{cfg.model.name}"):
+            final_pipeline.fit(X, y)
+
+        return final_pipeline, {"cv_f1_macro": study.best_value}
+
+@hydra.main(version_base=None, config_path="../../conf", config_name="train")
+def main(cfg: DictConfig) -> None:
+    """Entry point for the training phase configured by Hydra."""
+    mlflow.set_experiment("spam-classifier")
+    
+    X, y, count_columns = load_xy(cfg.data.train, cfg.data.label_col)
+    logger.info("Starting Optuna search for '%s' with %d rows", cfg.model.name, len(X))
+    
+    pipeline, metrics = train_and_evaluate(cfg, X, y, count_columns)
+    logger.info("Best cross-validation metrics: %s", metrics)
+    
+    model_path = Path(cfg.model_out)
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, model_path)
-    logger.info("Saved %s", model_path)
+    logger.info("Saved final optimal model to %s", model_path)
 
 
 if __name__ == "__main__":

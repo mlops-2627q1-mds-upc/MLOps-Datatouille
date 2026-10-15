@@ -55,17 +55,19 @@ stages:
     do:
       cmd: >-
         python -m src.modeling.phase_3_training
-        --model ${item}
-        --train ${split.train}
-        --model-out models/${item}.joblib
-        --label-col ${data.label_col}
-        --max-features ${train.max_features}
-        --cv-folds ${train.cv_folds}
-        --random-state ${train.random_state}
+        model=${item}
+        data.train=${split.train}
+        data.label_col=${data.label_col}
+        train.max_features=${train.max_features}
+        train.cv_folds=${train.cv_folds}
+        train.random_state=${train.random_state}
+        model_out=models/${item}.joblib
       deps:
         - ${split.train}
         - src/data/preprocess.py
         - src/modeling/phase_3_training.py
+        - conf/train.yaml
+        - conf/model/${item}.yaml
       params:
         - data.label_col
         - train.max_features
