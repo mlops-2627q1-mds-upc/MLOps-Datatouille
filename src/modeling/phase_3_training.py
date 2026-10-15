@@ -2,13 +2,18 @@
 
 Usage (from the root of the repo):
     python -m src.modeling.phase_3_training --model logreg \
-        --train data/dataset/train.csv --model-out models/logreg.joblib
+        --train data/dataset/train.csv --model-out models/logreg.joblib \
+        --metrics-out reports/metrics/train/logreg.json
+
+Params and CV metrics are logged to MLflow (see src.modeling.tracking).
 """
 import argparse
+import json
 import logging
 from pathlib import Path
 
 import joblib
+import mlflow
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
@@ -19,7 +24,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import LinearSVC
 
+from src.config import MLFLOW_EXPERIMENT_NAME
 from src.data.preprocess import make_tfidf
+from src.modeling.tracking import file_md5, start_training_run
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -83,12 +90,25 @@ def train_and_evaluate(model_name, X, y, count_columns, max_features=3000, cv_fo
     return pipeline, metrics
 
 
-def main():
+def save_metrics(metrics: dict[str, float], path: Path) -> None:
+    """Write metrics as JSON so DVC can track them and later stages can read them.
+
+    Args:
+        metrics: Metric name to value.
+        path: Output JSON file. Parent directories are created if missing.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+
+
+def main() -> None:
+    """Train one model, log it to MLflow, and save the model and its CV metrics."""
     parser = argparse.ArgumentParser(description="Trains a model.")
     parser.add_argument("--model", required=True,
                         help="logreg | naive_bayes | linear_svm | random_forest")
     parser.add_argument("--train", required=True, help="Train CSV")
     parser.add_argument("--model-out", required=True, help="Output path of the model (.joblib)")
+    parser.add_argument("--metrics-out", required=True, help="Output path of CV metrics (.json)")
     parser.add_argument("--label-col", default="label")
     parser.add_argument("--max-features", type=int, default=3000)
     parser.add_argument("--cv-folds", type=int, default=5)
@@ -98,13 +118,31 @@ def main():
     X, y, count_columns = load_xy(args.train, args.label_col)
     logger.info("Training '%s' with %d rows", args.model, len(X))
 
-    pipeline, metrics = train_and_evaluate(
-        args.model, X, y, count_columns,
-        max_features=args.max_features,
-        cv_folds=args.cv_folds,
-        random_state=args.random_state,
-    )
-    logger.info("Cross-validation metrics: %s", metrics)
+    params = {
+        "model": args.model,
+        "label_col": args.label_col,
+        "max_features": args.max_features,
+        "cv_folds": args.cv_folds,
+        "random_state": args.random_state,
+        "train_path": args.train,
+        "train_md5": file_md5(Path(args.train)),
+        "train_rows": len(X),
+    }
+    with start_training_run(args.model, MLFLOW_EXPERIMENT_NAME) as run:
+        pipeline, metrics = train_and_evaluate(
+            args.model, X, y, count_columns,
+            max_features=args.max_features,
+            cv_folds=args.cv_folds,
+            random_state=args.random_state,
+        )
+        classifier_params = pipeline.named_steps["classifier"].get_params()
+        mlflow.log_params(params)
+        mlflow.log_params({f"classifier.{key}": val for key, val in classifier_params.items()})
+        mlflow.log_metrics(metrics)
+        logger.info("Cross-validation metrics: %s (MLflow run %s)", metrics, run.info.run_id)
+
+    save_metrics(metrics, Path(args.metrics_out))
+    logger.info("Saved %s", args.metrics_out)
 
     model_path = Path(args.model_out)
     model_path.parent.mkdir(parents=True, exist_ok=True)

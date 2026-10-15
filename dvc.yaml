@@ -58,6 +58,7 @@ stages:
         --model ${item}
         --train ${split.train}
         --model-out models/${item}.joblib
+        --metrics-out reports/metrics/train/${item}.json
         --label-col ${data.label_col}
         --max-features ${train.max_features}
         --cv-folds ${train.cv_folds}
@@ -66,6 +67,7 @@ stages:
         - ${split.train}
         - src/data/preprocess.py
         - src/modeling/phase_3_training.py
+        - src/modeling/tracking.py
       params:
         - data.label_col
         - train.max_features
@@ -73,6 +75,8 @@ stages:
         - train.random_state
       outs:
         - models/${item}.joblib
+      metrics:
+        - reports/metrics/train/${item}.json
 
   evaluate:
     foreach: ${train.models}
