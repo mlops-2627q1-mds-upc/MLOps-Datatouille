@@ -94,7 +94,7 @@ def configure_context():
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
     data_source = context.data_sources.add_or_update_pandas_filesystem(
-        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR.relative_to(ROOT_DIR).as_posix()
+        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR.relative_to(ROOT_DIR)
     )
     asset = data_source.add_csv_asset(name=ASSET_NAME)
     batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)

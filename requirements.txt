@@ -18,6 +18,4 @@ python-dotenv
 ruff==0.16.9
 tqdm
 typer
-fastapi
-httpx
 -e .
