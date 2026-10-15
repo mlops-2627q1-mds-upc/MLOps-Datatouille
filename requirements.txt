@@ -8,13 +8,15 @@ pandas==2.3.3
 pytest==8.4.2
 scikit-learn==1.7.2
 awscli
+codecarbon>=3.0
 datasets
 loguru
 mlflow>=3,<4
 mkdocs
+mlflow
 pip
 python-dotenv
-ruff
+ruff==0.16.9
 tqdm
 typer
 transformers

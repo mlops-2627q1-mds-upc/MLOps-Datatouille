@@ -1,21 +1,28 @@
 import re
 import string
 import unicodedata
-import emoji                            # pip install emoji
-from nltk.stem import PorterStemmer     # pip install nltk
+
+import emoji  # pip install emoji
+from nltk.stem import PorterStemmer  # pip install nltk
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
+# ---------------------------------------------------------------------------
+# 0. PATTERNS.
+# ---------------------------------------------------------------------------
 
 URL_PATTERN = r"https?://\S+|www\.\S+"
 MONEY_PATTERN = (
-    r"(?:\$|€|£|\b(?:USD|EUR|GBP)\b)\s*\d+(?:[.,]\d+)*"
-    r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"
+    r"(?:\$|€|£|\b(?:USD|EUR|GBP)\b)\s*\d+(?:[.,]\d+)*"  # $100, € 10.000, USD 50
+    r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"  # 500$, 10.000 €, 50USD
 )
 SENTENCE_END_PATTERN = r"[.!?]+"
+
 URL_TOKEN = "xxurl"
 MONEY_TOKEN = "xxmoney"
 SPECIAL_TOKENS = {URL_TOKEN, MONEY_TOKEN}
+
 _stemmer = PorterStemmer()
+
 
 # ---------------------------------------------------------------------------
 # 1. Cleaning text.
@@ -85,6 +92,7 @@ def stem_text(text):
 # ---------------------------------------------------------------------------
 # 2. Counts on the original text
 # ---------------------------------------------------------------------------
+
 
 def count_characters(text):
     """Number of characters."""
@@ -162,6 +170,7 @@ def clean_text(text, emojis_as_text=False):
 # ---------------------------------------------------------------------------
 # 4. DataFrame functions
 # ---------------------------------------------------------------------------
+
 
 def remove_duplicates(df, column):
     """Remove rows with the same value in `column` (keep the first)."""

@@ -192,4 +192,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-/pre.xml
+
+# CodeCarbon: raw per-machine measurements
+reports/emissions/*.csv

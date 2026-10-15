@@ -4,6 +4,7 @@ Usage (from the root of the repo):
     python -m src.modeling.phase_4_evaluation --model-path models/logreg.joblib \
         --test data/dataset/test.csv
 """
+
 import argparse
 import logging
 

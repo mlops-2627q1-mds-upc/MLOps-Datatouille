@@ -15,8 +15,10 @@ Usage (from the root of the repo):
 import argparse
 import logging
 from pathlib import Path
+
 import pandas as pd
 from transformers import pipeline
+
 from src.data import preprocess as pp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
