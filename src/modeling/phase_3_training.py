@@ -26,7 +26,7 @@ from sklearn.svm import LinearSVC
 
 from src.config import MLFLOW_EXPERIMENT_NAME
 from src.data.preprocess import make_tfidf
-from src.modeling.tracking import file_md5, start_training_run
+from src.modeling.tracking import log_dataset, start_model_run
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -124,11 +124,8 @@ def main() -> None:
         "max_features": args.max_features,
         "cv_folds": args.cv_folds,
         "random_state": args.random_state,
-        "train_path": args.train,
-        "train_md5": file_md5(Path(args.train)),
-        "train_rows": len(X),
     }
-    with start_training_run(args.model, MLFLOW_EXPERIMENT_NAME) as run:
+    with start_model_run(args.model, MLFLOW_EXPERIMENT_NAME) as run:
         pipeline, metrics = train_and_evaluate(
             args.model, X, y, count_columns,
             max_features=args.max_features,
@@ -136,6 +133,7 @@ def main() -> None:
             random_state=args.random_state,
         )
         classifier_params = pipeline.named_steps["classifier"].get_params()
+        log_dataset(X, y, Path(args.train), context="training")
         mlflow.log_params(params)
         mlflow.log_params({f"classifier.{key}": val for key, val in classifier_params.items()})
         mlflow.log_metrics(metrics)

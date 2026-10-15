@@ -83,13 +83,19 @@ stages:
     do:
       cmd: >-
         python -m src.modeling.phase_4_evaluation
+        --model ${item}
         --model-path models/${item}.joblib
         --test ${split.test}
+        --metrics-out reports/metrics/test/${item}.json
         --label-col ${data.label_col}
       deps:
         - models/${item}.joblib
         - ${split.test}
         - src/modeling/phase_3_training.py
         - src/modeling/phase_4_evaluation.py
+        - src/modeling/tracking.py
       params:
         - data.label_col
+      metrics:
+        - reports/metrics/test/${item}.json:
+            cache: false

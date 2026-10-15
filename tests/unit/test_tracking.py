@@ -5,6 +5,7 @@ from pathlib import Path
 
 import mlflow
 from mlflow.tracking import MlflowClient
+import pandas as pd
 import pytest
 
 from src.modeling.phase_3_training import save_metrics
@@ -16,7 +17,8 @@ from src.modeling.tracking import (
     build_exp_tags,
     build_run_name,
     file_md5,
-    start_training_run,
+    log_dataset,
+    start_model_run,
 )
 
 EXPERIMENT = "test-experiment"
@@ -89,7 +91,7 @@ def test_runs_share_one_parent_under_dvc_exp(
     monkeypatch.setenv("DVC_EXP_BASELINE_REV", "abc123")
 
     for model in ("logreg", "naive_bayes"):
-        with start_training_run(model, EXPERIMENT):
+        with start_model_run(model, EXPERIMENT):
             mlflow.log_metric("cv_f1_macro", 0.9)
 
     runs = _runs(tracking_uri)
@@ -109,7 +111,7 @@ def test_new_dvc_exp_gets_new_parent(
     """Each DVC experiment gets its own parent run."""
     for exp_name in ("exp-a", "exp-b"):
         monkeypatch.setenv("DVC_EXP_NAME", exp_name)
-        with start_training_run("logreg", EXPERIMENT):
+        with start_model_run("logreg", EXPERIMENT):
             pass
 
     parents = [r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "parent"]
@@ -118,10 +120,57 @@ def test_new_dvc_exp_gets_new_parent(
 
 def test_standalone_run_outside_dvc_exp(tracking_uri: str) -> None:
     """Outside dvc exp run, a standalone run named after the model is logged."""
-    with start_training_run("logreg", EXPERIMENT):
+    with start_model_run("logreg", EXPERIMENT):
         pass
 
     runs = _runs(tracking_uri)
     assert len(runs) == 1
     assert runs[0].info.run_name == "logreg"
     assert "mlflow.parentRunId" not in runs[0].data.tags
+
+
+def test_resume_reopens_model_child_run(
+    tracking_uri: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Evaluation adds its metrics to the model's training run, not a new run."""
+    monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
+    for model in ("logreg", "naive_bayes"):
+        with start_model_run(model, EXPERIMENT):
+            mlflow.log_metric("cv_f1_macro", 0.9)
+    with start_model_run("logreg", EXPERIMENT, resume=True):
+        mlflow.log_metric("test_f1_macro", 0.8)
+
+    children = [r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "child"]
+    assert len(children) == 2
+    logreg = next(r for r in children if r.info.run_name == "my-exp-logreg")
+    assert logreg.data.metrics == {"cv_f1_macro": 0.9, "test_f1_macro": 0.8}
+    assert logreg.info.status == "FINISHED"
+
+
+def test_resume_creates_child_run_when_missing(
+    tracking_uri: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If training was skipped (cached by DVC), evaluation still logs a child run."""
+    monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
+    with start_model_run("logreg", EXPERIMENT, resume=True):
+        mlflow.log_metric("test_f1_macro", 0.8)
+
+    children = [r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "child"]
+    assert [r.info.run_name for r in children] == ["my-exp-logreg"]
+    assert "mlflow.parentRunId" in children[0].data.tags
+
+
+def test_log_dataset_uses_full_file_md5_as_digest(tracking_uri: str, tmp_path: Path) -> None:
+    """The dataset is logged with its context and the whole-file MD5 as digest."""
+    path = tmp_path / "test.csv"
+    df = pd.DataFrame({"clean_text": ["hi", "win now"], "label": ["ham", "spam"]})
+    df.to_csv(path, index=False)
+
+    mlflow.set_experiment(EXPERIMENT)
+    with mlflow.start_run() as run:
+        log_dataset(df[["clean_text"]], df["label"], path, context="testing")
+
+    dataset_input = MlflowClient(tracking_uri).get_run(run.info.run_id).inputs.dataset_inputs[0]
+    assert dataset_input.dataset.digest == file_md5(path)
+    assert dataset_input.dataset.name == "test"
+    assert {tag.key: tag.value for tag in dataset_input.tags}["mlflow.data.context"] == "testing"
