@@ -16,7 +16,7 @@ MONEY_PATTERN = (
     r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"  # 500$, 10.000 €, 50USD
 )
 EMAIL_PATTERN = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"  # john.doe@mail.com
-PHONE_PATTERN = r"(?<!\w)\+?\(?\d(?:[\s().-]{0,2}\d){8,14}(?!\w)"  # +34 612 345 678
+PHONE_PATTERN = r"(?<!\w)\+\d{1,3}(?:[\s().-]{0,2}\d){7,13}(?!\w)"  # +34 612 345 678
 SENTENCE_END_PATTERN = r"[.!?]+"
 
 URL_TOKEN = "xxurl"

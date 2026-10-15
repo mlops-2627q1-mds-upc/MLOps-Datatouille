@@ -87,7 +87,7 @@ def test_dataframe_cleaning_with_emoji_conversion_and_custom_output():
 
 def test_phase_one_anonymizes_before_counting_and_cleaning():
     """Test of integrating contact-detail anonymization into the complete phase-one flow."""
-    original = "Write to john.doe@gmail.com or phone 612 345 678."
+    original = "Write to john.doe@gmail.com or phone +34 612 345 678."
     raw = pd.DataFrame(
         {
             "text": [original, "The meeting starts tomorrow."],

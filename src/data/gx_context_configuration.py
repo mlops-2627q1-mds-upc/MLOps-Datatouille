@@ -67,7 +67,9 @@ def build_expectations():
         gxe.ExpectColumnValuesToNotBeNull(column=TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=TEXT_COL, min_value=1),
-        gxe.ExpectColumnValuesToNotMatchRegex(column=TEXT_COL, regex=f"{EMAIL_PATTERN}|{PHONE_PATTERN}"),
+        gxe.ExpectColumnValuesToNotMatchRegex(
+            column=TEXT_COL, regex=f"{EMAIL_PATTERN}|{PHONE_PATTERN}"
+        ),
         gxe.ExpectColumnValuesToNotBeNull(column=CLEAN_TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=CLEAN_TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=CLEAN_TEXT_COL, min_value=1),
@@ -92,7 +94,7 @@ def configure_context():
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
     data_source = context.data_sources.add_or_update_pandas_filesystem(
-        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR
+        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR.relative_to(ROOT_DIR).as_posix()
     )
     asset = data_source.add_csv_asset(name=ASSET_NAME)
     batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)

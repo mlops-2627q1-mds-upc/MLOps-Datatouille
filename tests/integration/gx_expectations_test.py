@@ -6,32 +6,16 @@ which runs in the DVC ``validate_processed`` stage.
 """
 
 import great_expectations as gx
-from great_expectations import ValidationDefinition
 import pandas as pd
 import pytest
-from pytest import fixture
 
 from src.data.gx_context_configuration import (
     EXPECTED_COLUMNS,
     ROOT_DIR,
-    VALIDATION_NAME,
     build_expectations,
 )
 
-
-@fixture
-def processed_data_validator() -> ValidationDefinition:
-    context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
-    return context.validation_definitions.get(VALIDATION_NAME)
-
-
-def test_processed_data(processed_data_validator: ValidationDefinition):
-    """Test of validating the real processed dataset produced by the DVC pipeline."""
-    if not (ROOT_DIR / "data" / "processed" / "clean.csv").exists():
-        pytest.skip("data/processed/clean.csv not found; run `dvc pull` or `dvc repro` first")
-    validation_result = processed_data_validator.run(result_format="BOOLEAN_ONLY")
-    expectations_failed = validation_result["statistics"]["unsuccessful_expectations"]
-    assert expectations_failed == 0, f"There were {expectations_failed} failing expectations."
+PROCESSED_DATA_PATH = ROOT_DIR / "data" / "processed" / "clean.csv"
 
 
 def _validate_dataframe(dataframe: pd.DataFrame):
@@ -61,6 +45,19 @@ def _valid_processed_dataframe() -> pd.DataFrame:
     )
 
 
+def test_processed_data():
+    """Test of validating the real processed dataset produced by the DVC pipeline."""
+    if not PROCESSED_DATA_PATH.exists():
+        pytest.skip("data/processed/clean.csv not found; run `dvc pull` or `dvc repro` first")
+    result = _validate_dataframe(pd.read_csv(PROCESSED_DATA_PATH))
+    failed_expectations = [
+        expectation_result.expectation_config.type
+        for expectation_result in result.results
+        if not expectation_result.success
+    ]
+    assert result.success, f"Failing expectations: {failed_expectations}"
+
+
 def test_configured_expectations_accept_valid_processed_dataframe():
     """Test of accepting an in-memory dataset that satisfies all configured expectations."""
     result = _validate_dataframe(_valid_processed_dataframe())
@@ -76,7 +73,7 @@ def test_configured_expectations_accept_valid_processed_dataframe():
         ("clean_text", None, "expect_column_values_to_not_be_null"),
         ("n_urls", -1, "expect_column_values_to_be_between"),
         ("text", "Mail john@spam.com now", "expect_column_values_to_not_match_regex"),
-        ("text", "Call 612 345 678 now", "expect_column_values_to_not_match_regex"),
+        ("text", "Call +34 612 345 678 now", "expect_column_values_to_not_match_regex"),
     ],
 )
 def test_configured_expectations_reject_invalid_processed_data(

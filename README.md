@@ -68,9 +68,11 @@ Unit tests for preprocessing, data splitting, and anonymization are grouped in
 Pytest tests are not part of the DVC pipeline.
 
 Phase-one cleaning can also anonymize contact details before count features and text
-normalization. Email addresses are replaced with `xxemail` and phone numbers with
-`xxphone`, using the regular expressions defined in `src/data/preprocess.py`. This is
-enabled for the DVC `clean` stage by `data.anonymize: true` in `params.yaml`.
+normalization. Email addresses are replaced with `xxemail`, and phone numbers in
+international format (starting with `+` and a country code) are replaced with `xxphone`,
+using the regular expressions defined in `src/data/preprocess.py`. Local numbers without
+a country code are not detected. This is enabled for the DVC `clean` stage by
+`data.anonymize: true` in `params.yaml`.
 The anonymization unit tests are in `tests/unit/test_anonymization.py`, and the
 phase-one integration test is in `tests/integration/test_preprocess_integration.py`.
 Run these tests separately with pytest.
