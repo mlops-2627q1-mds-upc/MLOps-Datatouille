@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Tuple
 import hydra
 import joblib
 import mlflow
+from omegaconf import DictConfig
 import optuna
 import pandas as pd
-from omegaconf import DictConfig
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -25,7 +25,6 @@ from sklearn.svm import LinearSVC
 from src.data.preprocess import make_tfidf
 from src.emissions import track_emissions
 
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -37,16 +36,16 @@ def get_classifier(
         name: str, trial: optuna.Trial, model_cfg: DictConfig, random_state: int = 42
 ) -> Any:
     """Instantiate a classifier with hyperparameters sampled from Optuna.
-    
+
     Args:
         name: Name of the classifier algorithm.
         trial: Optuna trial object for hyperparameter suggestion.
         model_cfg: Hydra configuration dict containing the search space boundaries.
         random_state: Random seed for deterministic reproducibility.
-        
+
     Returns:
         An instantiated scikit-learn classifier ready for training.
-        
+
     Raises:
         ValueError: If the specified model name is not supported.
     """
@@ -68,9 +67,9 @@ def get_classifier(
             "n_estimators", model_cfg.n_estimators.low, model_cfg.n_estimators.high
         )
         return RandomForestClassifier(
-            n_estimators=n_estimators, 
-            class_weight="balanced", 
-            random_state=random_state, 
+            n_estimators=n_estimators,
+            class_weight="balanced",
+            random_state=random_state,
             n_jobs=-1
         )
     else:
@@ -81,10 +80,10 @@ def get_classifier(
 
 def get_count_columns(df: pd.DataFrame) -> List[str]:
     """Identify the count columns generated during Phase 1 preprocessing.
-    
+
     Args:
         df: The processed feature dataset.
-        
+
     Returns:
         List of column names prefixed with 'n_'.
     """
@@ -111,13 +110,13 @@ def train_and_evaluate(
     cfg: DictConfig, X: pd.DataFrame, y: pd.Series, count_columns: List[str]
 ) -> Tuple[Pipeline, Dict[str, float]]:
     """Execute Optuna hyperparameter study, log via MLflow, and train the final global pipeline.
-    
+
     Args:
         cfg: The combined Hydra configuration dictionary.
         X: Feature dataset.
         y: Target labels.
         count_columns: List of metadata count features for the numerical scaler.
-        
+
     Returns:
         Tuple containing the optimal fitted Pipeline and its final cross-validation metrics.
     """
@@ -145,11 +144,11 @@ def train_and_evaluate(
                 f"cv_{name}": round(float(scores[f"test_{name}"].mean()), 4) for name in SCORING
             }
             metrics["cv_f1_macro_std"] = round(float(scores["test_f1_macro"].std()), 4)
-            
+
             mlflow.log_params(trial.params)
             mlflow.log_metrics(metrics)
             return metrics["cv_f1_macro"]
-            
+
     with mlflow.start_run(run_name=f"optuna_search_{cfg.model_name}"):
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=cfg.train.n_trials)
@@ -179,13 +178,13 @@ def train_and_evaluate(
 def main(cfg: DictConfig) -> None:
     """Entry point for the training phase configured by Hydra."""
     mlflow.set_experiment("spam-classifier")
-    
+
     X, y, count_columns = load_xy(cfg.data.train, cfg.data.label_col)
     logger.info("Starting Optuna search for '%s' with %d rows", cfg.model.name, len(X))
-    
+
     pipeline, metrics = train_and_evaluate(cfg, X, y, count_columns)
     logger.info("Best cross-validation metrics: %s", metrics)
-    
+
     model_path = Path(cfg.model_out)
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, model_path)
