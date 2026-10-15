@@ -1,8 +1,9 @@
 """Phase 3 of the pipeline: training and hyperparameter tuning with Hydra, Optuna, and MLflow.
 
 Usage (orchestrated by DVC):
-    python -m src.modeling.phase_3_training model=logreg
+    python -m src.modeling.train model=logreg
 """
+
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -10,9 +11,9 @@ from typing import Any, Dict, List, Tuple
 import hydra
 import joblib
 import mlflow
-from omegaconf import DictConfig
 import optuna
 import pandas as pd
+from omegaconf import DictConfig
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -70,7 +71,7 @@ def get_classifier(
             n_estimators=n_estimators,
             class_weight="balanced",
             random_state=random_state,
-            n_jobs=-1
+            n_jobs=-1,
         )
     else:
         raise ValueError(
@@ -120,6 +121,7 @@ def train_and_evaluate(
     Returns:
         Tuple containing the optimal fitted Pipeline and its final cross-validation metrics.
     """
+
     def objective(trial: optuna.Trial) -> float:
         with mlflow.start_run(run_name=f"trial_{trial.number}", nested=True):
             classifier = get_classifier(
@@ -149,7 +151,7 @@ def train_and_evaluate(
             mlflow.log_metrics(metrics)
             return metrics["cv_f1_macro"]
 
-    with mlflow.start_run(run_name=f"optuna_search_{cfg.model_name}"):
+    with mlflow.start_run(run_name=f"optuna_search_{cfg.model.name}"):
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=cfg.train.n_trials)
 
@@ -173,6 +175,7 @@ def train_and_evaluate(
             final_pipeline.fit(X, y)
 
         return final_pipeline, {"cv_f1_macro": study.best_value}
+
 
 @hydra.main(version_base=None, config_path="../../conf", config_name="train")
 def main(cfg: DictConfig) -> None:
