@@ -11,9 +11,9 @@ from typing import Any, Dict, List, Tuple
 import hydra
 import joblib
 import mlflow
+from omegaconf import DictConfig
 import optuna
 import pandas as pd
-from omegaconf import DictConfig
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
