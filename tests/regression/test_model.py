@@ -34,15 +34,13 @@ if not (MODEL_PATH.exists() and TEST_PATH.exists()):
 @pytest.fixture(scope="module")
 def model() -> Pipeline:
     """Load the selected model artifact."""
-    model_path = MODELS_DIR / f"{MODEL_NAME}.joblib"
-    return joblib.load(model_path)
+    return joblib.load(MODEL_PATH)
 
 
 @pytest.fixture(scope="module")
 def test_data() -> tuple[pd.DataFrame, pd.Series]:
     """Load every example from the held-out test split."""
-    test_path = DATA_DIR / "dataset" / "test.csv"
-    features, labels, _ = load_xy(test_path, LABEL_COLUMN)
+    features, labels, _ = load_xy(TEST_PATH, LABEL_COLUMN)
     return features, labels
 
 
