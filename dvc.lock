@@ -382,3 +382,30 @@ stages:
       hash: md5
       md5: 770822c2b0d92da5626c5ac343b9a4b5
       size: 3134
+  select:
+    cmd: python -m src.modeling.phase_5_selection --metric cv_f1_macro 
+      --metrics-dir reports/metrics/train --models-dir models --output 
+      reports/best_model.json
+    deps:
+    - path: reports/metrics/train
+      hash: md5
+      md5: aeaf5e28e681e73e55e44a94a570a91e.dir
+      size: 640
+      nfiles: 5
+    - path: src/modeling/phase_5_selection.py
+      hash: md5
+      md5: 7842e54889126abfccb19617237bce0d
+      size: 4349
+    params:
+      params.yaml:
+        select.metric: cv_f1_macro
+        train.models:
+        - logreg
+        - naive_bayes
+        - linear_svm
+        - random_forest
+    outs:
+    - path: reports/best_model.json
+      hash: md5
+      md5: 63cf71d92f3e13aac219b384feb2bc1f
+      size: 120

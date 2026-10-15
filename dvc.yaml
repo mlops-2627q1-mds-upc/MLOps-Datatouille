@@ -97,5 +97,20 @@ stages:
       params:
         - data.label_col
       metrics:
-        - reports/metrics/test/${item}.json:
-            cache: false
+        - reports/metrics/test/${item}.json
+
+  select:
+    cmd: >-
+      python -m src.modeling.phase_5_selection
+      --metric ${select.metric}
+      --metrics-dir reports/metrics/train
+      --models-dir models
+      --output reports/best_model.json
+    deps:
+      - reports/metrics/train
+      - src/modeling/phase_5_selection.py
+    params:
+      - train.models
+      - select.metric
+    metrics:
+      - reports/best_model.json

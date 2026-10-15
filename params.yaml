@@ -17,3 +17,6 @@ train:
   max_features: 3000
   cv_folds: 5
   random_state: 42
+
+select:
+  metric: cv_f1_macro
