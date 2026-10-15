@@ -51,14 +51,14 @@ fluent_datasources:
     assets:
       clean_spam_dataset:
         type: csv
-        id: e56dda8a-eb53-4f23-9c91-b685f9b5b4d8
+        id: 82f03098-e75d-4a57-8cea-007f9e7c4e60
         batch_definitions:
           full_csv:
-            id: 1e88f738-76cf-4d4b-b73a-2684e110de6b
+            id: 1694f3bc-2c6f-44d4-bb90-dbbb314b74a7
             partitioner:
               regex: clean.csv$
               param_names: []
-    base_directory: 
-      /Users/carlesaguilera/Desktop/MLOps-Datatouille/data/processed
+    base_directory: C:\Users\berta\Desktop\DATA SCIENCE\Tercer 
+      semestre\MLOPS\MLOps-Datatouille\data\processed
 analytics_enabled:
 data_context_id: ecf40cab-cfab-4898-b4dc-eb219a9a1c25

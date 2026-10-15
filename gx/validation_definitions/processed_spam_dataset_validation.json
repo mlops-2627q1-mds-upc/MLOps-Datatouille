@@ -1,11 +1,11 @@
 {
   "data": {
     "asset": {
-      "id": "e56dda8a-eb53-4f23-9c91-b685f9b5b4d8",
+      "id": "82f03098-e75d-4a57-8cea-007f9e7c4e60",
       "name": "clean_spam_dataset"
     },
     "batch_definition": {
-      "id": "1e88f738-76cf-4d4b-b73a-2684e110de6b",
+      "id": "1694f3bc-2c6f-44d4-bb90-dbbb314b74a7",
       "name": "full_csv"
     },
     "datasource": {
