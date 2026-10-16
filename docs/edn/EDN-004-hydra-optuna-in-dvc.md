@@ -1,4 +1,4 @@
-**Engineering Decision Notebook (EDN) — Entry**
+**Engineering Decision Notebook (EDN) - Entry**
 
 **Milestone:** M2 & M3 (Model Building: Reproducibility and Quality Assurance)
 
