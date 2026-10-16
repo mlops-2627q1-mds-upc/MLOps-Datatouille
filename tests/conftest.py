@@ -1,5 +1,9 @@
 """Fixtures shared by all the test modules."""
 
+from collections.abc import Iterator
+from pathlib import Path
+
+import mlflow
 import pandas as pd
 import pytest
 
@@ -23,3 +27,15 @@ def sample_df():
             "label": ["spam", "ham", "spam", "spam", "ham", "spam", "ham", "spam", "ham", "spam"],
         }
     )
+
+
+@pytest.fixture
+def tracking_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """Point MLflow to a throwaway local store and clear DVC experiment env vars."""
+    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", uri)
+    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
+    monkeypatch.delenv("DVC_EXP_BASELINE_REV", raising=False)
+    mlflow.set_tracking_uri(uri)
+    yield uri
+    mlflow.set_tracking_uri(None)

@@ -71,12 +71,16 @@ stages:
         train.max_features=${train.max_features}
         train.cv_folds=${train.cv_folds}
         train.random_state=${train.random_state}
+        train.n_trials=${train.n_trials}
         model_out=models/${item}.joblib
+        metrics_out=reports/metrics/train/${item}.json
       deps:
         - ${split.train}
         - src/data/preprocess.py
         - src/config.py
+        - src/emissions.py
         - src/modeling/train.py
+        - src/modeling/tracking.py
         - conf/train.yaml
         - conf/model/${item}.yaml
       params:
@@ -84,21 +88,45 @@ stages:
         - train.max_features
         - train.cv_folds
         - train.random_state
+        - train.n_trials
       outs:
         - models/${item}.joblib
+      metrics:
+        - reports/metrics/train/${item}.json
 
   evaluate:
     foreach: ${train.models}
     do:
       cmd: >-
         python -m src.modeling.evaluation
+        --model ${item}
         --model-path models/${item}.joblib
         --test ${split.test}
+        --metrics-out reports/metrics/test/${item}.json
         --label-col ${data.label_col}
       deps:
         - models/${item}.joblib
         - ${split.test}
         - src/modeling/train.py
         - src/modeling/evaluation.py
+        - src/modeling/tracking.py
       params:
         - data.label_col
+      metrics:
+        - reports/metrics/test/${item}.json
+
+  select:
+    cmd: >-
+      python -m src.modeling.selection
+      --metric ${select.metric}
+      --metrics-dir reports/metrics/train
+      --models-dir models
+      --output reports/best_model.json
+    deps:
+      - reports/metrics/train
+      - src/modeling/selection.py
+    params:
+      - train.models
+      - select.metric
+    metrics:
+      - reports/best_model.json
