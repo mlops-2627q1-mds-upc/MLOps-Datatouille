@@ -1,12 +1,13 @@
 """Phase 4 of the pipeline: evaluation of a trained model on the held-out test set.
 
 Usage (from the root of the repo):
-    python -m src.modeling.phase_4_evaluation --model logreg \
+    python -m src.modeling.evaluation --model logreg \
         --model-path models/logreg.joblib --test data/dataset/test.csv \
         --metrics-out reports/metrics/test/logreg.json
 
 Test metrics are logged to the model's MLflow run from training (see src.modeling.tracking).
 """
+
 import argparse
 import logging
 from pathlib import Path
@@ -17,8 +18,8 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 from src.config import MLFLOW_EXPERIMENT_NAME
-from src.modeling.phase_3_training import load_xy, save_metrics
 from src.modeling.tracking import log_dataset, start_model_run
+from src.modeling.train import load_xy, save_metrics
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)

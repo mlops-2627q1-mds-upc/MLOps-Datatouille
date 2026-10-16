@@ -1,10 +1,10 @@
 import re
 import string
 import unicodedata
-import emoji                            # pip install emoji
-from nltk.stem import PorterStemmer     # pip install nltk
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
+import emoji  # pip install emoji
+from nltk.stem import PorterStemmer  # pip install nltk
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
 # ---------------------------------------------------------------------------
 # 0. PATTERNS.
@@ -12,16 +12,21 @@ from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
 URL_PATTERN = r"https?://\S+|www\.\S+"
 MONEY_PATTERN = (
-    r"(?:\$|€|£|\b(?:USD|EUR|GBP)\b)\s*\d+(?:[.,]\d+)*"     # $100, € 10.000, USD 50
-    r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"      # 500$, 10.000 €, 50USD
+    r"(?:\$|€|£|\b(?:USD|EUR|GBP)\b)\s*\d+(?:[.,]\d+)*"  # $100, € 10.000, USD 50
+    r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"  # 500$, 10.000 €, 50USD
 )
+EMAIL_PATTERN = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"  # john.doe@mail.com
+PHONE_PATTERN = r"(?<!\w)\+\d{1,3}(?:[\s().-]{0,2}\d){7,13}(?!\w)"  # +34 612 345 678
 SENTENCE_END_PATTERN = r"[.!?]+"
 
 URL_TOKEN = "xxurl"
 MONEY_TOKEN = "xxmoney"
-SPECIAL_TOKENS = {URL_TOKEN, MONEY_TOKEN}
+EMAIL_TOKEN = "xxemail"
+PHONE_TOKEN = "xxphone"
+SPECIAL_TOKENS = {URL_TOKEN, MONEY_TOKEN, EMAIL_TOKEN, PHONE_TOKEN}
 
 _stemmer = PorterStemmer()
+
 
 # ---------------------------------------------------------------------------
 # 1. Cleaning text.
@@ -66,6 +71,12 @@ def replace_money(text):
     return re.sub(MONEY_PATTERN, f" {MONEY_TOKEN} ", text)
 
 
+def anonymize_text(text):
+    """Replace email addresses and phone numbers with EMAIL_TOKEN and PHONE_TOKEN."""
+    text = re.sub(EMAIL_PATTERN, f" {EMAIL_TOKEN} ", text)
+    return re.sub(PHONE_PATTERN, f" {PHONE_TOKEN} ", text)
+
+
 def convert_emojis(text):
     """Convert each emoji to its English name, with words separated by spaces."""
     return emoji.replace_emoji(
@@ -91,6 +102,7 @@ def stem_text(text):
 # ---------------------------------------------------------------------------
 # 2. Counts on the original text
 # ---------------------------------------------------------------------------
+
 
 def count_characters(text):
     """Number of characters."""
@@ -168,6 +180,7 @@ def clean_text(text, emojis_as_text=False):
 # ---------------------------------------------------------------------------
 # 4. DataFrame functions
 # ---------------------------------------------------------------------------
+
 
 def remove_duplicates(df, column):
     """Remove rows with the same value in `column` (keep the first)."""

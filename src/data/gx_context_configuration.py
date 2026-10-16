@@ -14,10 +14,13 @@ Usage (from the root of the repo):
 
 import json
 import logging
-import sys
 from pathlib import Path
+import sys
+
 import great_expectations as gx
 import great_expectations.expectations as gxe
+
+from src.data.preprocess import EMAIL_PATTERN, PHONE_PATTERN
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -25,6 +28,7 @@ logging.getLogger("great_expectations").setLevel(logging.WARNING)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+PROCESSED_DIR_REL = Path("data") / "processed"
 PROCESSED_FILE = "clean.csv"
 
 TEXT_COL = "text"
@@ -64,10 +68,14 @@ def build_expectations():
         gxe.ExpectColumnValuesToNotBeNull(column=TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=TEXT_COL, min_value=1),
+        gxe.ExpectColumnValuesToNotMatchRegex(
+            column=TEXT_COL, regex=f"{EMAIL_PATTERN}|{PHONE_PATTERN}"
+        ),
         gxe.ExpectColumnValuesToNotBeNull(column=CLEAN_TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=CLEAN_TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=CLEAN_TEXT_COL, min_value=1),
         gxe.ExpectColumnValuesToNotBeNull(column=LABEL_COL),
+        gxe.ExpectColumnValuesToBeOfType(column=LABEL_COL, type_="str"),
         gxe.ExpectColumnValuesToBeInSet(column=LABEL_COL, value_set=LABELS),
         gxe.ExpectColumnDistinctValuesToEqualSet(column=LABEL_COL, value_set=LABELS),
     ]
@@ -75,6 +83,7 @@ def build_expectations():
         expectations.extend(
             [
                 gxe.ExpectColumnValuesToNotBeNull(column=column),
+                gxe.ExpectColumnValuesToBeOfType(column=column, type_="int64"),
                 gxe.ExpectColumnValuesToBeBetween(column=column, min_value=0),
             ]
         )
@@ -86,7 +95,7 @@ def configure_context():
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
     data_source = context.data_sources.add_or_update_pandas_filesystem(
-        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR
+        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR_REL
     )
     asset = data_source.add_csv_asset(name=ASSET_NAME)
     batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)

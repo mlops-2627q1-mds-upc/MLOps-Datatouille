@@ -1,10 +1,12 @@
 data:
-  raw: data/raw/daisy_dataset_spam_detection.csv
+  hf_id: diegovelilla/email-classification-dataset
+  raw: data/raw/raw.csv
   clean: data/processed/clean.csv
   text_col: text
   label_col: label
   encoding: utf-8
   emojis_as_text: false
+  anonymize: true
 
 split:
   train: data/dataset/train.csv

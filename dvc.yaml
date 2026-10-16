@@ -1,17 +1,31 @@
 stages:
+  download:
+    cmd: >-
+      python -m src.download_dataset
+      --dataset-id ${data.hf_id}
+      --output ${data.raw}
+    deps:
+      - src/download_dataset.py
+    params:
+      - data.hf_id
+      - data.raw
+    outs:
+      - ${data.raw}
+
   clean:
     cmd: >-
-      python -m src.data.phase_1_cleaning
+      python -m src.data.cleaning
       --input ${data.raw}
       --output ${data.clean}
       --text-col ${data.text_col}
       --label-col ${data.label_col}
       --encoding ${data.encoding}
       --emojis-as-text ${data.emojis_as_text}
+      --anonymize ${data.anonymize}
     deps:
       - ${data.raw}
       - src/data/preprocess.py
-      - src/data/phase_1_cleaning.py
+      - src/data/cleaning.py
     params:
       - data
     outs:
@@ -22,16 +36,12 @@ stages:
     deps:
       - ${data.clean}
       - src/data/gx_context_configuration.py
-      - gx/great_expectations.yml
-      - gx/expectations/processed_spam_dataset_suite.json
-      - gx/validation_definitions/processed_spam_dataset_validation.json
-      - gx/checkpoints/processed_spam_dataset_checkpoint.json
     outs:
       - data/processed/gx_validation.json
 
   split:
     cmd: >-
-      python -m src.data.phase_2_splitting
+      python -m src.data.splitting
       --input ${data.clean}
       --train ${split.train}
       --test ${split.test}
@@ -42,7 +52,7 @@ stages:
       - ${data.clean}
       - data/processed/gx_validation.json
       - src/data/split_data.py
-      - src/data/phase_2_splitting.py
+      - src/data/splitting.py
     params:
       - split
       - data.label_col
@@ -54,25 +64,31 @@ stages:
     foreach: ${train.models}
     do:
       cmd: >-
-        python -m src.modeling.phase_3_training
-        --model ${item}
-        --train ${split.train}
-        --model-out models/${item}.joblib
-        --metrics-out reports/metrics/train/${item}.json
-        --label-col ${data.label_col}
-        --max-features ${train.max_features}
-        --cv-folds ${train.cv_folds}
-        --random-state ${train.random_state}
+        python -m src.modeling.train
+        model=${item}
+        data.train=${split.train}
+        data.label_col=${data.label_col}
+        train.max_features=${train.max_features}
+        train.cv_folds=${train.cv_folds}
+        train.random_state=${train.random_state}
+        train.n_trials=${train.n_trials}
+        model_out=models/${item}.joblib
+        metrics_out=reports/metrics/train/${item}.json
       deps:
         - ${split.train}
         - src/data/preprocess.py
-        - src/modeling/phase_3_training.py
+        - src/config.py
+        - src/emissions.py
+        - src/modeling/train.py
         - src/modeling/tracking.py
+        - conf/train.yaml
+        - conf/model/${item}.yaml
       params:
         - data.label_col
         - train.max_features
         - train.cv_folds
         - train.random_state
+        - train.n_trials
       outs:
         - models/${item}.joblib
       metrics:
@@ -82,7 +98,7 @@ stages:
     foreach: ${train.models}
     do:
       cmd: >-
-        python -m src.modeling.phase_4_evaluation
+        python -m src.modeling.evaluation
         --model ${item}
         --model-path models/${item}.joblib
         --test ${split.test}
@@ -91,8 +107,8 @@ stages:
       deps:
         - models/${item}.joblib
         - ${split.test}
-        - src/modeling/phase_3_training.py
-        - src/modeling/phase_4_evaluation.py
+        - src/modeling/train.py
+        - src/modeling/evaluation.py
         - src/modeling/tracking.py
       params:
         - data.label_col
@@ -101,14 +117,14 @@ stages:
 
   select:
     cmd: >-
-      python -m src.modeling.phase_5_selection
+      python -m src.modeling.selection
       --metric ${select.metric}
       --metrics-dir reports/metrics/train
       --models-dir models
       --output reports/best_model.json
     deps:
       - reports/metrics/train
-      - src/modeling/phase_5_selection.py
+      - src/modeling/selection.py
     params:
       - train.models
       - select.metric

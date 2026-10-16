@@ -1,26 +1,30 @@
 schema: '2.0'
 stages:
   split:
-    cmd: python -m src.data.phase_2_splitting --input data/processed/clean.csv 
-      --train data/dataset/train.csv --test data/dataset/test.csv --label-col 
-      label --test-size 0.2 --random-state 42
+    cmd: python -m src.data.splitting --input data/processed/clean.csv --train 
+      data/dataset/train.csv --test data/dataset/test.csv --label-col label 
+      --test-size 0.2 --random-state 42
     deps:
     - path: data/processed/clean.csv
       hash: md5
-      md5: 181a179938ed0ef6966fe714206c4283
-      size: 4744764
+      md5: c833314dbe20ddc4c0666ac0216aea4a
+      size: 6356344
+      isexec: true
     - path: data/processed/gx_validation.json
       hash: md5
-      md5: 770822c2b0d92da5626c5ac343b9a4b5
-      size: 3134
-    - path: src/data/phase_2_splitting.py
-      hash: md5
-      md5: 16a54af286036bf76cf159e86634ea02
-      size: 1541
+      md5: 0fd44f28741845837513411ceebdc99a
+      size: 4242
+      isexec: true
     - path: src/data/split_data.py
       hash: md5
       md5: 48c24c14e572024f0f8813e7c1857c03
       size: 407
+      isexec: true
+    - path: src/data/splitting.py
+      hash: md5
+      md5: 55fde6d17bcf6e808b0bc3194ac290df
+      size: 1725
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
@@ -32,34 +36,50 @@ stages:
     outs:
     - path: data/dataset/test.csv
       hash: md5
-      md5: 56dfcc1477b66f5fb2cb3028682a4f53
-      size: 983494
+      md5: 470636338e2edeee5457f743097eb4a1
+      size: 1263925
+      isexec: true
     - path: data/dataset/train.csv
       hash: md5
-      md5: d5f236f2f3812c56952272e5f119e8a5
-      size: 3761367
+      md5: a838e2507dc4650faa8f21572bc706be
+      size: 5092516
+      isexec: true
   train@logreg:
-    cmd: python -m src.modeling.phase_3_training --model logreg --train 
-      data/dataset/train.csv --model-out models/logreg.joblib --metrics-out 
-      reports/metrics/train/logreg.json --label-col label --max-features 3000 
-      --cv-folds 5 --random-state 42
+    cmd: python -m src.modeling.train model=logreg 
+      data.train=data/dataset/train.csv data.label_col=label 
+      train.max_features=3000 train.cv_folds=5 train.random_state=42 
+      model_out=models/logreg.joblib
     deps:
+    - path: conf/model/logreg.yaml
+      hash: md5
+      md5: 76c911968bb74fae8a67e2ed8edd52c8
+      size: 74
+      isexec: true
+    - path: conf/train.yaml
+      hash: md5
+      md5: a1221b4b93104f4a54379ca85b517a5c
+      size: 205
+      isexec: true
     - path: data/dataset/train.csv
       hash: md5
-      md5: d5f236f2f3812c56952272e5f119e8a5
-      size: 3761367
+      md5: a838e2507dc4650faa8f21572bc706be
+      size: 5092516
+      isexec: true
+    - path: src/config.py
+      hash: md5
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
+      isexec: true
     - path: src/data/preprocess.py
       hash: md5
-      md5: fddb88e2f3b411c53b3e90a2e142ac00
-      size: 6366
-    - path: src/modeling/phase_3_training.py
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
@@ -69,34 +89,45 @@ stages:
     outs:
     - path: models/logreg.joblib
       hash: md5
-      md5: ca053b8c119c8f18862095bd27041e3d
-      size: 134497
-    - path: reports/metrics/train/logreg.json
-      hash: md5
-      md5: ba5aec468337db4afa79dca1b64b107b
-      size: 143
+      md5: f7bdfee95bb4a477fad5d364287e0633
+      size: 134593
+      isexec: true
   train@naive_bayes:
-    cmd: python -m src.modeling.phase_3_training --model naive_bayes --train 
-      data/dataset/train.csv --model-out models/naive_bayes.joblib --metrics-out
-      reports/metrics/train/naive_bayes.json --label-col label --max-features 
-      3000 --cv-folds 5 --random-state 42
+    cmd: python -m src.modeling.train model=naive_bayes 
+      data.train=data/dataset/train.csv data.label_col=label 
+      train.max_features=3000 train.cv_folds=5 train.random_state=42 
+      model_out=models/naive_bayes.joblib
     deps:
+    - path: conf/model/naive_bayes.yaml
+      hash: md5
+      md5: 7668ae9c43f49372b8219e29fc418890
+      size: 83
+      isexec: true
+    - path: conf/train.yaml
+      hash: md5
+      md5: a1221b4b93104f4a54379ca85b517a5c
+      size: 205
+      isexec: true
     - path: data/dataset/train.csv
       hash: md5
-      md5: d5f236f2f3812c56952272e5f119e8a5
-      size: 3761367
+      md5: a838e2507dc4650faa8f21572bc706be
+      size: 5092516
+      isexec: true
+    - path: src/config.py
+      hash: md5
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
+      isexec: true
     - path: src/data/preprocess.py
       hash: md5
-      md5: fddb88e2f3b411c53b3e90a2e142ac00
-      size: 6366
-    - path: src/modeling/phase_3_training.py
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
@@ -106,34 +137,45 @@ stages:
     outs:
     - path: models/naive_bayes.joblib
       hash: md5
-      md5: f3de3b6b28ab1404ac61b2fc879fca58
-      size: 206537
-    - path: reports/metrics/train/naive_bayes.json
-      hash: md5
-      md5: 1577a899145d093e96de59323f3de959
-      size: 143
+      md5: 4e8ad72eac0281cd56601de45de5c7e1
+      size: 206633
+      isexec: true
   train@linear_svm:
-    cmd: python -m src.modeling.phase_3_training --model linear_svm --train 
-      data/dataset/train.csv --model-out models/linear_svm.joblib --metrics-out 
-      reports/metrics/train/linear_svm.json --label-col label --max-features 
-      3000 --cv-folds 5 --random-state 42
+    cmd: python -m src.modeling.train model=linear_svm 
+      data.train=data/dataset/train.csv data.label_col=label 
+      train.max_features=3000 train.cv_folds=5 train.random_state=42 
+      model_out=models/linear_svm.joblib
     deps:
+    - path: conf/model/linear_svm.yaml
+      hash: md5
+      md5: 3279bbdf0c34695de5de483ce6cb5d5b
+      size: 78
+      isexec: true
+    - path: conf/train.yaml
+      hash: md5
+      md5: a1221b4b93104f4a54379ca85b517a5c
+      size: 205
+      isexec: true
     - path: data/dataset/train.csv
       hash: md5
-      md5: d5f236f2f3812c56952272e5f119e8a5
-      size: 3761367
+      md5: a838e2507dc4650faa8f21572bc706be
+      size: 5092516
+      isexec: true
+    - path: src/config.py
+      hash: md5
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
+      isexec: true
     - path: src/data/preprocess.py
       hash: md5
-      md5: fddb88e2f3b411c53b3e90a2e142ac00
-      size: 6366
-    - path: src/modeling/phase_3_training.py
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
@@ -143,34 +185,45 @@ stages:
     outs:
     - path: models/linear_svm.joblib
       hash: md5
-      md5: 225e5c59b9db3ea7a3be466c7b8b3291
-      size: 134381
-    - path: reports/metrics/train/linear_svm.json
-      hash: md5
-      md5: 33c812484158b4d3fde2cf2869f5cdc9
-      size: 143
+      md5: 401a07e89fb643097e9f640ca7aad655
+      size: 134477
+      isexec: true
   train@random_forest:
-    cmd: python -m src.modeling.phase_3_training --model random_forest --train 
-      data/dataset/train.csv --model-out models/random_forest.joblib 
-      --metrics-out reports/metrics/train/random_forest.json --label-col label 
-      --max-features 3000 --cv-folds 5 --random-state 42
+    cmd: python -m src.modeling.train model=random_forest 
+      data.train=data/dataset/train.csv data.label_col=label 
+      train.max_features=3000 train.cv_folds=5 train.random_state=42 
+      model_out=models/random_forest.joblib
     deps:
+    - path: conf/model/random_forest.yaml
+      hash: md5
+      md5: bad66140a7654af11b1992a6101119c3
+      size: 75
+      isexec: true
+    - path: conf/train.yaml
+      hash: md5
+      md5: a1221b4b93104f4a54379ca85b517a5c
+      size: 205
+      isexec: true
     - path: data/dataset/train.csv
       hash: md5
-      md5: d5f236f2f3812c56952272e5f119e8a5
-      size: 3761367
+      md5: a838e2507dc4650faa8f21572bc706be
+      size: 5092516
+      isexec: true
+    - path: src/config.py
+      hash: md5
+      md5: 671b7c33f3a8032c5b7d683680b8bc63
+      size: 1204
+      isexec: true
     - path: src/data/preprocess.py
       hash: md5
-      md5: fddb88e2f3b411c53b3e90a2e142ac00
-      size: 6366
-    - path: src/modeling/phase_3_training.py
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
@@ -180,232 +233,189 @@ stages:
     outs:
     - path: models/random_forest.joblib
       hash: md5
-      md5: 8a2af7db3148bc1191852c6f0d95737a
-      size: 18513042
-    - path: reports/metrics/train/random_forest.json
-      hash: md5
-      md5: c2525e7613ae28192de4e1cdd1ab041a
-      size: 143
+      md5: 236e068429dfee3ea69a3e1f3890104d
+      size: 8769186
+      isexec: true
   clean:
-    cmd: python -m src.data.phase_1_cleaning --input 
-      data/raw/daisy_dataset_spam_detection.csv --output 
+    cmd: python -m src.data.cleaning --input data/raw/raw.csv --output 
       data/processed/clean.csv --text-col text --label-col label --encoding 
-      utf-8 --emojis-as-text false
+      utf-8 --emojis-as-text false --anonymize true
     deps:
-    - path: data/raw/daisy_dataset_spam_detection.csv
+    - path: data/raw/raw.csv
       hash: md5
-      md5: 9829bca4ac766386b1f64e20ce8ebd8e
-      size: 3130581
-    - path: src/data/phase_1_cleaning.py
+      md5: 982264625154999f8e644822f3120cb9
+      size: 4214970
+      isexec: true
+    - path: src/data/cleaning.py
       hash: md5
-      md5: e488776b30b4229817301828816ebc6d
-      size: 2588
+      md5: 661077b4d57b2b3f58eafb99f99b7084
+      size: 3952
+      isexec: true
     - path: src/data/preprocess.py
       hash: md5
-      md5: fddb88e2f3b411c53b3e90a2e142ac00
-      size: 6366
+      md5: eed2a653a646e509ec6b951a702548b8
+      size: 6794
+      isexec: true
     params:
       params.yaml:
         data:
-          raw: data/raw/daisy_dataset_spam_detection.csv
+          hf_id: diegovelilla/email-classification-dataset
+          raw: data/raw/raw.csv
           clean: data/processed/clean.csv
           text_col: text
           label_col: label
           encoding: utf-8
           emojis_as_text: false
+          anonymize: true
     outs:
     - path: data/processed/clean.csv
       hash: md5
-      md5: 181a179938ed0ef6966fe714206c4283
-      size: 4744764
+      md5: c833314dbe20ddc4c0666ac0216aea4a
+      size: 6356344
+      isexec: true
   evaluate@logreg:
-    cmd: python -m src.modeling.phase_4_evaluation --model logreg --model-path 
-      models/logreg.joblib --test data/dataset/test.csv --metrics-out 
-      reports/metrics/test/logreg.json --label-col label
+    cmd: python -m src.modeling.evaluation --model-path models/logreg.joblib 
+      --test data/dataset/test.csv --label-col label
     deps:
     - path: data/dataset/test.csv
       hash: md5
-      md5: 56dfcc1477b66f5fb2cb3028682a4f53
-      size: 983494
+      md5: 470636338e2edeee5457f743097eb4a1
+      size: 1263925
+      isexec: true
     - path: models/logreg.joblib
       hash: md5
-      md5: ca053b8c119c8f18862095bd27041e3d
-      size: 134497
-    - path: src/modeling/phase_3_training.py
+      md5: f7bdfee95bb4a477fad5d364287e0633
+      size: 134593
+      isexec: true
+    - path: src/modeling/evaluation.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/phase_4_evaluation.py
+      md5: aa65b81e187a9da365e3cffefaa8d0c6
+      size: 1625
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: e569eecaf2c0aaad93bb9e1566dc5554
-      size: 2742
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
-    outs:
-    - path: reports/metrics/test/logreg.json
-      hash: md5
-      md5: c30a52ae951930cc93ce799062f18405
-      size: 122
   evaluate@naive_bayes:
-    cmd: python -m src.modeling.phase_4_evaluation --model naive_bayes 
-      --model-path models/naive_bayes.joblib --test data/dataset/test.csv 
-      --metrics-out reports/metrics/test/naive_bayes.json --label-col label
+    cmd: python -m src.modeling.evaluation --model-path 
+      models/naive_bayes.joblib --test data/dataset/test.csv --label-col label
     deps:
     - path: data/dataset/test.csv
       hash: md5
-      md5: 56dfcc1477b66f5fb2cb3028682a4f53
-      size: 983494
+      md5: 470636338e2edeee5457f743097eb4a1
+      size: 1263925
+      isexec: true
     - path: models/naive_bayes.joblib
       hash: md5
-      md5: f3de3b6b28ab1404ac61b2fc879fca58
-      size: 206537
-    - path: src/modeling/phase_3_training.py
+      md5: 4e8ad72eac0281cd56601de45de5c7e1
+      size: 206633
+      isexec: true
+    - path: src/modeling/evaluation.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/phase_4_evaluation.py
+      md5: aa65b81e187a9da365e3cffefaa8d0c6
+      size: 1625
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: e569eecaf2c0aaad93bb9e1566dc5554
-      size: 2742
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
-    outs:
-    - path: reports/metrics/test/naive_bayes.json
-      hash: md5
-      md5: ecbcef674030db851eed5fc1b526b762
-      size: 122
   evaluate@linear_svm:
-    cmd: python -m src.modeling.phase_4_evaluation --model linear_svm 
-      --model-path models/linear_svm.joblib --test data/dataset/test.csv 
-      --metrics-out reports/metrics/test/linear_svm.json --label-col label
+    cmd: python -m src.modeling.evaluation --model-path models/linear_svm.joblib
+      --test data/dataset/test.csv --label-col label
     deps:
     - path: data/dataset/test.csv
       hash: md5
-      md5: 56dfcc1477b66f5fb2cb3028682a4f53
-      size: 983494
+      md5: 470636338e2edeee5457f743097eb4a1
+      size: 1263925
+      isexec: true
     - path: models/linear_svm.joblib
       hash: md5
-      md5: 225e5c59b9db3ea7a3be466c7b8b3291
-      size: 134381
-    - path: src/modeling/phase_3_training.py
+      md5: 401a07e89fb643097e9f640ca7aad655
+      size: 134477
+      isexec: true
+    - path: src/modeling/evaluation.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/phase_4_evaluation.py
+      md5: aa65b81e187a9da365e3cffefaa8d0c6
+      size: 1625
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: e569eecaf2c0aaad93bb9e1566dc5554
-      size: 2742
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
-    outs:
-    - path: reports/metrics/test/linear_svm.json
-      hash: md5
-      md5: e63307d6d66604d4db58f05db637b8c4
-      size: 122
   evaluate@random_forest:
-    cmd: python -m src.modeling.phase_4_evaluation --model random_forest 
-      --model-path models/random_forest.joblib --test data/dataset/test.csv 
-      --metrics-out reports/metrics/test/random_forest.json --label-col label
+    cmd: python -m src.modeling.evaluation --model-path 
+      models/random_forest.joblib --test data/dataset/test.csv --label-col label
     deps:
     - path: data/dataset/test.csv
       hash: md5
-      md5: 56dfcc1477b66f5fb2cb3028682a4f53
-      size: 983494
+      md5: 470636338e2edeee5457f743097eb4a1
+      size: 1263925
+      isexec: true
     - path: models/random_forest.joblib
       hash: md5
-      md5: 8a2af7db3148bc1191852c6f0d95737a
-      size: 18513042
-    - path: src/modeling/phase_3_training.py
+      md5: 236e068429dfee3ea69a3e1f3890104d
+      size: 8769186
+      isexec: true
+    - path: src/modeling/evaluation.py
       hash: md5
-      md5: 0395ad785b39e6532b222208f02b3a87
-      size: 6160
-    - path: src/modeling/phase_4_evaluation.py
+      md5: aa65b81e187a9da365e3cffefaa8d0c6
+      size: 1625
+      isexec: true
+    - path: src/modeling/train.py
       hash: md5
-      md5: e569eecaf2c0aaad93bb9e1566dc5554
-      size: 2742
-    - path: src/modeling/tracking.py
-      hash: md5
-      md5: 5b2e0f666fa9362cb41c5003ae01d4fc
-      size: 8916
+      md5: fed2c7957472062a0bf76423acf0d280
+      size: 7480
+      isexec: true
     params:
       params.yaml:
         data.label_col: label
-    outs:
-    - path: reports/metrics/test/random_forest.json
-      hash: md5
-      md5: 6d373ee20545916ce42a5e72f38d8155
-      size: 122
   validate_processed:
     cmd: python -m src.data.gx_context_configuration
     deps:
     - path: data/processed/clean.csv
       hash: md5
-      md5: 181a179938ed0ef6966fe714206c4283
-      size: 4744764
-    - path: gx/checkpoints/processed_spam_dataset_checkpoint.json
-      hash: md5
-      md5: 38e72a382fb149988a6407fac5356740
-      size: 399
-    - path: gx/expectations/processed_spam_dataset_suite.json
-      hash: md5
-      md5: 703f436529f7f80c65addc5afb745e6c
-      size: 6393
-    - path: gx/great_expectations.yml
-      hash: md5
-      md5: cbf4476675aec2c14982caf86b931a22
-      size: 1882
-    - path: gx/validation_definitions/processed_spam_dataset_validation.json
-      hash: md5
-      md5: 7ef68d71e5496ebaaa201740125310a7
-      size: 553
+      md5: c833314dbe20ddc4c0666ac0216aea4a
+      size: 6356344
+      isexec: true
     - path: src/data/gx_context_configuration.py
       hash: md5
-      md5: 82a12b36b71b9ffc137accb26fca34cf
-      size: 5224
+      md5: 860691f793c9bce3f7fd99746e07ad15
+      size: 5619
+      isexec: true
     outs:
     - path: data/processed/gx_validation.json
       hash: md5
-      md5: 770822c2b0d92da5626c5ac343b9a4b5
-      size: 3134
-  select:
-    cmd: python -m src.modeling.phase_5_selection --metric cv_f1_macro 
-      --metrics-dir reports/metrics/train --models-dir models --output 
-      reports/best_model.json
+      md5: 0fd44f28741845837513411ceebdc99a
+      size: 4242
+      isexec: true
+  download:
+    cmd: python -m src.download_dataset --dataset-id 
+      diegovelilla/email-classification-dataset --output data/raw/raw.csv
     deps:
-    - path: reports/metrics/train
+    - path: src/download_dataset.py
       hash: md5
-      md5: aeaf5e28e681e73e55e44a94a570a91e.dir
-      size: 640
-      nfiles: 5
-    - path: src/modeling/phase_5_selection.py
-      hash: md5
-      md5: 7842e54889126abfccb19617237bce0d
-      size: 4349
+      md5: 463392979eeb0476828e9f4bc8d03420
+      size: 1504
+      isexec: true
     params:
       params.yaml:
-        select.metric: cv_f1_macro
-        train.models:
-        - logreg
-        - naive_bayes
-        - linear_svm
-        - random_forest
+        data.hf_id: diegovelilla/email-classification-dataset
+        data.raw: data/raw/raw.csv
     outs:
-    - path: reports/best_model.json
+    - path: data/raw/raw.csv
       hash: md5
-      md5: 63cf71d92f3e13aac219b384feb2bc1f
-      size: 120
+      md5: 982264625154999f8e644822f3120cb9
+      size: 4214970
+      isexec: true
