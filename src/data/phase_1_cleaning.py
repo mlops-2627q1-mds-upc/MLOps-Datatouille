@@ -9,7 +9,7 @@ Steps:
 
 Usage (from the root of the repo):
     python -m src.data.phase_1_cleaning \
-        --input data/raw/daisy_dataset_spam_detection.csv --output data/processed/clean.csv
+        --input data/raw/raw.csv --output data/processed/clean.csv
 """
 
 import argparse

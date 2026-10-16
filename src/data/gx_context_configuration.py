@@ -28,6 +28,7 @@ logging.getLogger("great_expectations").setLevel(logging.WARNING)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+PROCESSED_DIR_REL = Path("data") / "processed"
 PROCESSED_FILE = "clean.csv"
 
 TEXT_COL = "text"
@@ -94,7 +95,7 @@ def configure_context():
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
     data_source = context.data_sources.add_or_update_pandas_filesystem(
-        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR.relative_to(ROOT_DIR)
+        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR_REL
     )
     asset = data_source.add_csv_asset(name=ASSET_NAME)
     batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)
