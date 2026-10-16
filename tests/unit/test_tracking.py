@@ -1,4 +1,5 @@
 """Unit tests for the MLflow tracking helpers of the training stage."""
+
 import hashlib
 import json
 from pathlib import Path
@@ -8,7 +9,6 @@ from mlflow.tracking import MlflowClient
 import pandas as pd
 import pytest
 
-from src.modeling.phase_3_training import save_metrics
 from src.modeling.tracking import (
     EXP_REF_TAG,
     NOTE_TAG,
@@ -20,20 +20,9 @@ from src.modeling.tracking import (
     log_dataset,
     start_model_run,
 )
+from src.modeling.train import save_metrics
 
 EXPERIMENT = "test-experiment"
-
-
-@pytest.fixture
-def tracking_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
-    """Point MLflow to a throwaway local store and clear DVC experiment env vars."""
-    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
-    monkeypatch.setenv("MLFLOW_TRACKING_URI", uri)
-    monkeypatch.delenv("DVC_EXP_NAME", raising=False)
-    monkeypatch.delenv("DVC_EXP_BASELINE_REV", raising=False)
-    mlflow.set_tracking_uri(uri)
-    yield uri
-    mlflow.set_tracking_uri(None)
 
 
 def _runs(uri: str) -> list:
@@ -105,9 +94,7 @@ def test_runs_share_one_parent_under_dvc_exp(
     assert {r.data.tags[EXP_REF_TAG] for r in runs} == {"refs/exps/ab/c123/my-exp"}
 
 
-def test_new_dvc_exp_gets_new_parent(
-    tracking_uri: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_new_dvc_exp_gets_new_parent(tracking_uri: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """Each DVC experiment gets its own parent run."""
     for exp_name in ("exp-a", "exp-b"):
         monkeypatch.setenv("DVC_EXP_NAME", exp_name)

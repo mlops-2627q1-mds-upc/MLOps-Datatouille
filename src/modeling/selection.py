@@ -1,4 +1,4 @@
-"""Phase 5 of the pipeline: selection of the best trained model by a cross-validation metric.
+"""Selection stage: choice of the best trained model by a cross-validation metric.
 
 The selection writes a pointer to the best model (name, metric, value and path) instead of
 copying it, so each model is stored only once. Test metrics are not used, so the test set
@@ -8,10 +8,11 @@ The list of models is read from ``train.models`` in params.yaml (via ``dvc.api``
 cannot interpolate lists into stage commands.
 
 Usage (from the root of the repo):
-    python -m src.modeling.phase_5_selection --metric cv_f1_macro \
+    python -m src.modeling.selection --metric cv_f1_macro \
         --metrics-dir reports/metrics/train --models-dir models \
         --output reports/best_model.json
 """
+
 import argparse
 import json
 import logging

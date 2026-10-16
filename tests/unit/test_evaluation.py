@@ -1,7 +1,8 @@
 """Unit tests for the evaluation stage."""
+
 import pandas as pd
 
-from src.modeling.phase_4_evaluation import compute_test_metrics
+from src.modeling.evaluation import compute_test_metrics
 
 
 def test_compute_test_metrics_perfect_predictions() -> None:

@@ -1,10 +1,11 @@
 """Unit tests for the model selection stage."""
+
 import json
 from pathlib import Path
 
 import pytest
 
-from src.modeling.phase_5_selection import build_selection, load_cv_metrics, select_best_model
+from src.modeling.selection import build_selection, load_cv_metrics, select_best_model
 
 
 def test_load_cv_metrics_reads_models_in_order(tmp_path: Path) -> None:

@@ -12,7 +12,6 @@ awscli
 codecarbon>=3.0
 datasets
 loguru
-mlflow>=3,<4
 mkdocs
 pip
 python-dotenv

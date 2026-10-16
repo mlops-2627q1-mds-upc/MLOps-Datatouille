@@ -3,7 +3,7 @@
 ## Run and log an experiment
 
 Train with `dvc exp run`. This logs one MLflow parent run per experiment, with one child run
-per model, all prefixed with the experiment name.
+per model and, under it, one run per Optuna trial, all prefixed with the experiment name.
 
 ```bash
 dvc exp run -n <exp_name>

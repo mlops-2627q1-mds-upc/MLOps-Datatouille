@@ -1,6 +1,7 @@
 defaults:
   - model: logreg
   - _self_
+  - override hydra/job_logging: stdout
 
 data:
   train: data/dataset/train.csv
@@ -13,3 +14,10 @@ train:
   n_trials: 10
 
 model_out: models/model.joblib
+metrics_out: reports/metrics/train/model.json
+
+# Run in the repo root and write no outputs/<date>/ folders or log files: DVC tracks outputs.
+hydra:
+  run:
+    dir: .
+  output_subdir: null

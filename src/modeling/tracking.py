@@ -6,6 +6,7 @@ a separate process, so the parent run is looked up by tags and reused instead of
 Parent and child runs record the DVC experiment name, git ref and restore commands, so a
 run can be reproduced from the MLflow UI with ``dvc exp pull`` + ``dvc exp apply``.
 """
+
 from collections.abc import Iterator
 from contextlib import contextmanager
 import hashlib
@@ -245,13 +246,9 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
         return
 
     client = MlflowClient()
-    parent_id = find_or_create_parent_run(
-        client, experiment.experiment_id, exp_name, baseline_rev
-    )
+    parent_id = find_or_create_parent_run(client, experiment.experiment_id, exp_name, baseline_rev)
     child_tags = build_lookup_tags(exp_name, baseline_rev, "child") | {MODEL_TAG: model_name}
-    child_id = (
-        find_latest_run(client, experiment.experiment_id, child_tags) if resume else None
-    )
+    child_id = find_latest_run(client, experiment.experiment_id, child_tags) if resume else None
     if child_id:
         child_args = {"run_id": child_id}
     else:
@@ -261,3 +258,24 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
         }
     with mlflow.start_run(run_id=parent_id), mlflow.start_run(nested=True, **child_args) as run:
         yield run
+
+
+def start_trial_run(model_name: str, trial_number: int) -> Run:
+    """Start the MLflow run of one hyperparameter-search trial, nested in the active run.
+
+    Must be called while the model's run (from ``start_model_run``) is active. The run gets
+    the ``trial`` role, so ``start_model_run(resume=True)`` never mistakes it for the model run.
+
+    Args:
+        model_name: Name of the model being tuned.
+        trial_number: Optuna trial number.
+
+    Returns:
+        The started MLflow run, usable as a context manager.
+    """
+    exp_name, _ = get_dvc_exp_context()
+    return mlflow.start_run(
+        run_name=build_run_name(exp_name, f"{model_name}-trial-{trial_number}"),
+        nested=True,
+        tags={RUN_ROLE_TAG: "trial", MODEL_TAG: model_name},
+    )
