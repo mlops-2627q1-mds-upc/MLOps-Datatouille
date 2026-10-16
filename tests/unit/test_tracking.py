@@ -1,7 +1,6 @@
 """Unit tests for the MLflow tracking helpers of the training stage."""
 
 import hashlib
-import json
 from pathlib import Path
 
 import mlflow
@@ -20,7 +19,6 @@ from src.modeling.tracking import (
     log_dataset,
     start_model_run,
 )
-from src.modeling.train import save_metrics
 
 EXPERIMENT = "test-experiment"
 
@@ -63,13 +61,6 @@ def test_file_md5_matches_hashlib(tmp_path: Path) -> None:
     path = tmp_path / "data.csv"
     path.write_bytes(b"text,label\nhi,ham\n")
     assert file_md5(path) == hashlib.md5(b"text,label\nhi,ham\n").hexdigest()
-
-
-def test_save_metrics_writes_json(tmp_path: Path) -> None:
-    """Metrics are written as JSON, creating missing parent directories."""
-    path = tmp_path / "nested" / "metrics.json"
-    save_metrics({"cv_f1_macro": 0.9}, path)
-    assert json.loads(path.read_text()) == {"cv_f1_macro": 0.9}
 
 
 def test_runs_share_one_parent_under_dvc_exp(

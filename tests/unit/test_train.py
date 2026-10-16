@@ -1,6 +1,8 @@
 """Unit tests for the training stage (Optuna study and MLflow nesting)."""
 
 from contextlib import nullcontext
+import json
+from pathlib import Path
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -45,6 +47,13 @@ def test_build_pipeline_ends_with_classifier() -> None:
     pipeline = train.build_pipeline(classifier, ["n_words"], max_features=10)
     assert list(pipeline.named_steps) == ["features", "classifier"]
     assert pipeline.named_steps["classifier"] is classifier
+
+
+def test_save_metrics_writes_json(tmp_path: Path) -> None:
+    """Metrics are written as JSON, creating missing parent directories."""
+    path = tmp_path / "nested" / "metrics.json"
+    train.save_metrics({"cv_f1_macro": 0.9}, path)
+    assert json.loads(path.read_text()) == {"cv_f1_macro": 0.9}
 
 
 def test_run_study_is_deterministic(tracking_uri: str, cfg: DictConfig, xy: tuple) -> None:
