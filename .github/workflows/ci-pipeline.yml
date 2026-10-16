@@ -34,10 +34,10 @@ jobs:
           ruff check src tests
           ruff format --check src tests
 
-      - name: Run Unit Tests (FastAPI & Logic)
-        # Only runs fast unit tests located in the unit directory
+      - name: Run Unit and Integration Tests
+        # Tests that need DVC-tracked data or models run locally after dvc repro
         run: |
-          pytest tests/unit/ -v
+          pytest tests/unit tests/integration -v -k "not test_processed_data"
 
       - name: Lightweight Data Validation (Sample)
         # Runs Great Expectations on a small sample to catch schema errors quickly
@@ -82,3 +82,5 @@ jobs:
         # Runs the heavy regression suite to ensure model performance hasn't degraded
         run: |
           pytest tests/regression/ -v
+          pytest tests/integration/ -v
+          pytest tests/unit/ -v

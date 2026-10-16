@@ -1,4 +1,5 @@
-"""Phase 3 of the pipeline: training and hyperparameter tuning with Hydra, Optuna, and MLflow.
+"""
+Phase 3 of the pipeline: training and hyperparameter tuning with Hydra, Optuna, and MLflow.
 
 Usage (orchestrated by DVC):
     python -m src.modeling.train model=logreg
@@ -36,7 +37,8 @@ SCORING = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 def get_classifier(
     name: str, trial: optuna.Trial, model_cfg: DictConfig, random_state: int = 42
 ) -> Any:
-    """Instantiate a classifier with hyperparameters sampled from Optuna.
+    """
+    Instantiate a classifier with hyperparameters sampled from Optuna.
 
     Args:
         name: Name of the classifier algorithm.
@@ -80,7 +82,8 @@ def get_classifier(
 
 
 def get_count_columns(df: pd.DataFrame) -> List[str]:
-    """Identify the count columns generated during Phase 1 preprocessing.
+    """
+    Identify the count columns generated during Phase 1 preprocessing.
 
     Args:
         df: The processed feature dataset.
@@ -92,7 +95,8 @@ def get_count_columns(df: pd.DataFrame) -> List[str]:
 
 
 def load_xy(path: str, label_col: str) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
-    """Load a CSV file and separate it into training features (X) and target array (y).
+    """
+    Load a CSV file and separate it into training features (X) and target array (y).
 
     Args:
         path: File path to the CSV dataset.
@@ -110,7 +114,8 @@ def load_xy(path: str, label_col: str) -> Tuple[pd.DataFrame, pd.Series, List[st
 def train_and_evaluate(
     cfg: DictConfig, X: pd.DataFrame, y: pd.Series, count_columns: List[str]
 ) -> Tuple[Pipeline, Dict[str, float]]:
-    """Execute Optuna hyperparameter study, log via MLflow, and train the final global pipeline.
+    """
+    Execute Optuna hyperparameter study, log via MLflow, and train the final global pipeline.
 
     Args:
         cfg: The combined Hydra configuration dictionary.
@@ -179,7 +184,15 @@ def train_and_evaluate(
 
 @hydra.main(version_base=None, config_path="../../conf", config_name="train")
 def main(cfg: DictConfig) -> None:
-    """Entry point for the training phase configured by Hydra."""
+    """
+    Entry point for the training phase configured by Hydra.
+
+    Args:
+        cfg: The combined Hydra configuration dictionary.
+
+    Returns:
+        None.
+    """
     mlflow.set_experiment("spam-classifier")
 
     X, y, count_columns = load_xy(cfg.data.train, cfg.data.label_col)

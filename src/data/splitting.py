@@ -1,4 +1,5 @@
-"""Phase 2 of the pipeline: cleaned dataset -> train / test.
+"""
+Phase 2 of the pipeline: cleaned dataset -> train / test.
 
 The split is stratified by the label and reproducible (random_state).
 
@@ -19,7 +20,16 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
+    """
+    Split the cleaned dataset into stratified train and test CSVs.
+
+    Args:
+        None: Arguments are parsed from the command line.
+
+    Returns:
+        None.
+    """
     parser = argparse.ArgumentParser(description="Train / test split.")
     parser.add_argument("--input", required=True, help="Preprocessed CSV")
     parser.add_argument("--train", required=True, help="Output train CSV")
