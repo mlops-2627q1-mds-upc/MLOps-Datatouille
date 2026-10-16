@@ -1,0 +1,22 @@
+{
+  "data": {
+    "asset": {
+      "id": "e93f2db5-6e2a-426a-8f14-0fef2e2e5f86",
+      "name": "clean_spam_dataset"
+    },
+    "batch_definition": {
+      "id": "0f28a497-e55d-4649-a72b-25395957a175",
+      "name": "full_csv"
+    },
+    "datasource": {
+      "id": "db249a91-6b05-4685-8f63-e53eb76d8903",
+      "name": "processed_data"
+    }
+  },
+  "id": "00ca431a-8d34-4fee-9a80-fd43cdf9ec64",
+  "name": "processed_spam_dataset_validation",
+  "suite": {
+    "id": "dc26b41a-3626-4a65-996e-53028a4104fe",
+    "name": "processed_spam_dataset_suite"
+  }
+}

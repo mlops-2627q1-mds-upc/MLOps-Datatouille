@@ -1,0 +1,5 @@
+name: random_forest
+search_space:
+  n_estimators:
+    low: 50
+    high: 300

@@ -1,0 +1,104 @@
+stages:
+  download:
+    cmd: >-
+      python -m src.download_dataset
+      --dataset-id ${data.hf_id}
+      --output ${data.raw}
+    deps:
+      - src/download_dataset.py
+    params:
+      - data.hf_id
+      - data.raw
+    outs:
+      - ${data.raw}
+
+  clean:
+    cmd: >-
+      python -m src.data.cleaning
+      --input ${data.raw}
+      --output ${data.clean}
+      --text-col ${data.text_col}
+      --label-col ${data.label_col}
+      --encoding ${data.encoding}
+      --emojis-as-text ${data.emojis_as_text}
+      --anonymize ${data.anonymize}
+    deps:
+      - ${data.raw}
+      - src/data/preprocess.py
+      - src/data/cleaning.py
+    params:
+      - data
+    outs:
+      - ${data.clean}
+
+  validate_processed:
+    cmd: python -m src.data.gx_context_configuration
+    deps:
+      - ${data.clean}
+      - src/data/gx_context_configuration.py
+    outs:
+      - data/processed/gx_validation.json
+
+  split:
+    cmd: >-
+      python -m src.data.splitting
+      --input ${data.clean}
+      --train ${split.train}
+      --test ${split.test}
+      --label-col ${data.label_col}
+      --test-size ${split.test_size}
+      --random-state ${split.random_state}
+    deps:
+      - ${data.clean}
+      - data/processed/gx_validation.json
+      - src/data/split_data.py
+      - src/data/splitting.py
+    params:
+      - split
+      - data.label_col
+    outs:
+      - ${split.train}
+      - ${split.test}
+
+  train:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.train
+        model=${item}
+        data.train=${split.train}
+        data.label_col=${data.label_col}
+        train.max_features=${train.max_features}
+        train.cv_folds=${train.cv_folds}
+        train.random_state=${train.random_state}
+        model_out=models/${item}.joblib
+      deps:
+        - ${split.train}
+        - src/data/preprocess.py
+        - src/config.py
+        - src/modeling/train.py
+        - conf/train.yaml
+        - conf/model/${item}.yaml
+      params:
+        - data.label_col
+        - train.max_features
+        - train.cv_folds
+        - train.random_state
+      outs:
+        - models/${item}.joblib
+
+  evaluate:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.evaluation
+        --model-path models/${item}.joblib
+        --test ${split.test}
+        --label-col ${data.label_col}
+      deps:
+        - models/${item}.joblib
+        - ${split.test}
+        - src/modeling/train.py
+        - src/modeling/evaluation.py
+      params:
+        - data.label_col
