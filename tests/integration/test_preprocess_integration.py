@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from src.data import phase_1_cleaning
+from src.data import cleaning
 from src.data import preprocess as pp
 
 
@@ -95,7 +95,7 @@ def test_phase_one_anonymizes_before_counting_and_cleaning():
         }
     )
 
-    result = phase_1_cleaning.preprocess_dataframe(
+    result = cleaning.preprocess_dataframe(
         raw,
         text_col="text",
         label_col="label",

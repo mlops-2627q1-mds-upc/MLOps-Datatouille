@@ -1,4 +1,5 @@
-"""CO2 experiment (issue #66): train each model N times under CodeCarbon.
+"""
+CO2 experiment: train each model N times under CodeCarbon.
 
 Measures training energy and emissions per model with 5-fold CV plus final
 fit, repeating each model `--reps` times and reporting the mean. Runs are
@@ -22,14 +23,24 @@ import time
 import codecarbon
 import pandas as pd
 import sklearn
+from sklearn.base import BaseEstimator
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, cross_validate
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.svm import LinearSVC
 
 from src.config import (
     CODECARBON_COUNTRY_ISO_CODE,
     CODECARBON_MEASURE_POWER_SECS,
     CODECARBON_TRACKING_MODE,
 )
+from src.data.preprocess import make_tfidf
 from src.emissions import emissions_summary, track_emissions
-from src.modeling.phase_3_training import load_xy, train_and_evaluate
+from src.modeling.train import SCORING, TEXT_COL, load_xy
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -38,8 +49,82 @@ MODELS = ["logreg", "naive_bayes", "linear_svm", "random_forest"]
 SUMMARY_KEYS = ["duration_s", "energy_consumed_kwh", "emissions_kg_co2eq"]
 
 
+def _default_classifier(name: str, random_state: int = 42) -> BaseEstimator:
+    """
+    Instantiate a classifier with default hyperparameters.
+
+    Plain defaults keep every rep comparable; hyperparameter search would
+    confound the energy measurement with search cost.
+
+    Args:
+        name: Model name accepted by `train_with_emission_tracking`.
+        random_state: Random seed for deterministic reproducibility.
+
+    Returns:
+        An instantiated scikit-learn classifier with default hyperparameters.
+
+    Raises:
+        ValueError: If the specified model name is not supported.
+    """
+    if name == "logreg":
+        return LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=random_state
+        )
+    if name == "naive_bayes":
+        return MultinomialNB()
+    if name == "linear_svm":
+        return LinearSVC(class_weight="balanced", random_state=random_state)
+    if name == "random_forest":
+        return RandomForestClassifier(
+            n_estimators=300, class_weight="balanced", random_state=random_state, n_jobs=-1
+        )
+    raise ValueError(f"Unknown model '{name}'. Options: {sorted(MODELS)}")
+
+
+def train_with_emission_tracking(
+    model: str,
+    X: pd.DataFrame,
+    y: pd.Series,
+    count_columns: list[str],
+    max_features: int = 3000,
+    cv_folds: int = 5,
+    random_state: int = 42,
+) -> tuple[Pipeline, dict[str, float]]:
+    """
+    Cross-validate with default hyperparameters and refit on all data.
+
+    Args:
+        model: Model name accepted by `_default_classifier`.
+        X: Feature frame.
+        y: Target series.
+        count_columns: Numeric count feature names.
+        max_features: TF-IDF vocabulary size.
+        cv_folds: Cross-validation folds.
+        random_state: Fixed seed for deterministic reproducibility.
+
+    Returns:
+        Tuple with the fitted pipeline and cross-validation metrics.
+    """
+    features = ColumnTransformer(
+        [
+            ("tfidf", make_tfidf(max_features), TEXT_COL),
+            ("counts", MinMaxScaler(), count_columns),
+        ]
+    )
+    pipeline = Pipeline(
+        [("features", features), ("classifier", _default_classifier(model, random_state))]
+    )
+    cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
+    scores = cross_validate(pipeline, X, y, cv=cv, scoring=SCORING)
+    metrics = {f"cv_{name}": round(float(scores[f"test_{name}"].mean()), 4) for name in SCORING}
+    metrics["cv_f1_macro_std"] = round(float(scores["test_f1_macro"].std()), 4)
+    pipeline.fit(X, y)
+    return pipeline, metrics
+
+
 def _cpu_model() -> str:
-    """Return the CPU model name, or a fallback identifier.
+    """
+    Return the CPU model name, or a fallback identifier.
 
     Returns:
         CPU model string from /proc/cpuinfo on Linux, else platform info.
@@ -55,7 +140,8 @@ def _cpu_model() -> str:
 
 
 def _ram_total_gb() -> float | None:
-    """Return total RAM in GB, or None if it cannot be determined.
+    """
+    Return total RAM in GB, or None if it cannot be determined.
 
     Returns:
         Total physical memory in gigabytes, or None on unsupported platforms.
@@ -69,7 +155,8 @@ def _ram_total_gb() -> float | None:
 
 
 def _gpu_model() -> str:
-    """Return the GPU model string, or 'unknown' if none is detected.
+    """
+    Return the GPU model string, or 'unknown' if none is detected.
 
     Returns:
         First GPU name reported by nvidia-smi, else 'unknown'.
@@ -128,10 +215,11 @@ def run_rep(
     measure_power_secs: float,
     hardware: dict,
 ) -> dict:
-    """Train one model once under emissions tracking.
+    """
+    Train one model once under emissions tracking.
 
     Args:
-        model: Model name accepted by `train_and_evaluate`.
+        model: Model name accepted by `train_with_emission_tracking`.
         rep: Repetition index (1-based), for record keeping.
         X: Feature frame.
         y: Target series.
@@ -152,7 +240,7 @@ def run_rep(
             output_dir=Path(tmp),
             measure_power_secs=measure_power_secs,
         ) as tracker:
-            _, metrics = train_and_evaluate(
+            _, metrics = train_with_emission_tracking(
                 model, X, y, count_columns, max_features, cv_folds, random_state
             )
         summary = emissions_summary(tracker)
@@ -160,7 +248,8 @@ def run_rep(
 
 
 def summarize(records: list[dict]) -> dict[str, dict[str, float]]:
-    """Compute mean and std of emission figures per model.
+    """
+    Compute mean and std of emission figures per model.
 
     Args:
         records: Per-rep records as returned by `run_rep`.
@@ -183,7 +272,9 @@ def summarize(records: list[dict]) -> dict[str, dict[str, float]]:
 
 
 def main() -> None:
-    """Run the CO2 measurement protocol and write results."""
+    """
+    Run the CO2 measurement protocol and write results.
+    """
     parser = argparse.ArgumentParser(description="Measure training CO2 per model.")
     parser.add_argument("--train", required=True, help="Train CSV")
     parser.add_argument("--out", required=True, help="Output JSONL with per-rep records")
