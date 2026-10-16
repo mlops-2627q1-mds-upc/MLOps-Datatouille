@@ -15,11 +15,15 @@ MONEY_PATTERN = (
     r"(?:\$|€|£|\b(?:USD|EUR|GBP)\b)\s*\d+(?:[.,]\d+)*"  # $100, € 10.000, USD 50
     r"|\d+(?:[.,]\d+)*\s*(?:\$|€|£|(?:USD|EUR|GBP)\b)"  # 500$, 10.000 €, 50USD
 )
+EMAIL_PATTERN = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"  # john.doe@mail.com
+PHONE_PATTERN = r"(?<!\w)\+\d{1,3}(?:[\s().-]{0,2}\d){7,13}(?!\w)"  # +34 612 345 678
 SENTENCE_END_PATTERN = r"[.!?]+"
 
 URL_TOKEN = "xxurl"
 MONEY_TOKEN = "xxmoney"
-SPECIAL_TOKENS = {URL_TOKEN, MONEY_TOKEN}
+EMAIL_TOKEN = "xxemail"
+PHONE_TOKEN = "xxphone"
+SPECIAL_TOKENS = {URL_TOKEN, MONEY_TOKEN, EMAIL_TOKEN, PHONE_TOKEN}
 
 _stemmer = PorterStemmer()
 
@@ -65,6 +69,12 @@ def replace_urls(text):
 def replace_money(text):
     """Replace money amounts (500$, 10.000 €, 50USD, $100) with MONEY_TOKEN."""
     return re.sub(MONEY_PATTERN, f" {MONEY_TOKEN} ", text)
+
+
+def anonymize_text(text):
+    """Replace email addresses and phone numbers with EMAIL_TOKEN and PHONE_TOKEN."""
+    text = re.sub(EMAIL_PATTERN, f" {EMAIL_TOKEN} ", text)
+    return re.sub(PHONE_PATTERN, f" {PHONE_TOKEN} ", text)
 
 
 def convert_emojis(text):

@@ -51,10 +51,10 @@ fluent_datasources:
     assets:
       clean_spam_dataset:
         type: csv
-        id: 790eb294-814e-4330-8a18-52463aeb74c2
+        id: e93f2db5-6e2a-426a-8f14-0fef2e2e5f86
         batch_definitions:
           full_csv:
-            id: 77c34118-a7bb-4032-b64e-30463913ec2f
+            id: 0f28a497-e55d-4649-a72b-25395957a175
             partitioner:
               regex: clean.csv$
               param_names: []

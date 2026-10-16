@@ -20,6 +20,8 @@ import sys
 import great_expectations as gx
 import great_expectations.expectations as gxe
 
+from src.data.preprocess import EMAIL_PATTERN, PHONE_PATTERN
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 logging.getLogger("great_expectations").setLevel(logging.WARNING)
@@ -66,10 +68,14 @@ def build_expectations():
         gxe.ExpectColumnValuesToNotBeNull(column=TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=TEXT_COL, min_value=1),
+        gxe.ExpectColumnValuesToNotMatchRegex(
+            column=TEXT_COL, regex=f"{EMAIL_PATTERN}|{PHONE_PATTERN}"
+        ),
         gxe.ExpectColumnValuesToNotBeNull(column=CLEAN_TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=CLEAN_TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=CLEAN_TEXT_COL, min_value=1),
         gxe.ExpectColumnValuesToNotBeNull(column=LABEL_COL),
+        gxe.ExpectColumnValuesToBeOfType(column=LABEL_COL, type_="str"),
         gxe.ExpectColumnValuesToBeInSet(column=LABEL_COL, value_set=LABELS),
         gxe.ExpectColumnDistinctValuesToEqualSet(column=LABEL_COL, value_set=LABELS),
     ]
@@ -77,6 +83,7 @@ def build_expectations():
         expectations.extend(
             [
                 gxe.ExpectColumnValuesToNotBeNull(column=column),
+                gxe.ExpectColumnValuesToBeOfType(column=column, type_="int64"),
                 gxe.ExpectColumnValuesToBeBetween(column=column, min_value=0),
             ]
         )

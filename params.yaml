@@ -6,6 +6,7 @@ data:
   label_col: label
   encoding: utf-8
   emojis_as_text: false
+  anonymize: true
 
 split:
   train: data/dataset/train.csv

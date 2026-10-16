@@ -1,45 +1,82 @@
-import pytest  # noqa: F401  # reserved for future fixtures/marks
+"""Regression tests for the trained spam-classification models."""
 
-# from src.models.predict_model import SpamClassifier, Summarizer
+import os
+
+import joblib
+import pandas as pd
+import pytest
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.pipeline import Pipeline
+
+from src.config import DATA_DIR, MODELS_DIR
+from src.modeling.phase_3_training import load_xy
+
+MODEL_NAMES = {"logreg", "naive_bayes", "linear_svm", "random_forest"}
+MODEL_NAME = os.environ.get("MODEL_NAME", "logreg")
+MIN_ACCURACY = 0.95
+MIN_PRECISION_MACRO = 0.95
+MIN_RECALL_MACRO = 0.95
+MIN_F1_MACRO = 0.95
+LABEL_COLUMN = "label"
+
+if MODEL_NAME not in MODEL_NAMES:
+    raise ValueError(f"Unknown MODEL_NAME {MODEL_NAME!r}; expected one of {sorted(MODEL_NAMES)}")
+
+MODEL_PATH = MODELS_DIR / f"{MODEL_NAME}.joblib"
+TEST_PATH = DATA_DIR / "dataset" / "test.csv"
+if not (MODEL_PATH.exists() and TEST_PATH.exists()):
+    pytest.skip(
+        f"{MODEL_PATH.name} or test.csv not found; run `dvc pull` or `dvc repro` first",
+        allow_module_level=True,
+    )
 
 
-def test_spam_model_accuracy_baseline():
-    """
-    Evaluates the model against a holdout set of the Deysi/spam-detection-dataset
-    to ensure performance hasn't degraded below acceptable thresholds.
-    """
-    # model = SpamClassifier.load_model('models/spam_model.pkl')
-    # test_data, test_labels = load_data('data/processed/test_set.csv')
-
-    # predictions = model.predict(test_data)
-    # accuracy = calculate_accuracy(predictions, test_labels)
-
-    # Assert accuracy remains above our established baseline (e.g., 90%)
-    # assert accuracy >= 0.90
-    assert True  # Mock pass
+@pytest.fixture(scope="module")
+def model() -> Pipeline:
+    """Load the selected model artifact."""
+    return joblib.load(MODEL_PATH)
 
 
-def test_spam_model_confidence_distribution():
-    """
-    Validates that the confidence score behaves rationally (e.g., highly obvious
-    spam should have a confidence score > 0.85).
-    """
-    obvious_spam_message = "VIAGRA CHEAP FREE MONEY NO SCAM!!!"  # noqa: F841
-    # confidence = model.predict_proba(obvious_spam_message)
-
-    # assert confidence > 0.85
-    assert True  # Mock pass
+@pytest.fixture(scope="module")
+def test_data() -> tuple[pd.DataFrame, pd.Series]:
+    """Load every example from the held-out test split."""
+    features, labels, _ = load_xy(TEST_PATH, LABEL_COLUMN)
+    return features, labels
 
 
-def test_secondary_component_integration():
-    """
-    Tests the second ML component (Summarization or Multilabel).
-    Validates that the output is not empty and conforms to expected length constraints.
-    """
-    long_message = "Hello, I am reaching out regarding your car's extended warranty..." * 10  # noqa: F841
+@pytest.fixture(scope="module")
+def model_metrics(
+    model: Pipeline,
+    test_data: tuple[pd.DataFrame, pd.Series],
+) -> dict[str, float]:
+    """Calculate classification metrics against all held-out labels."""
+    features, labels = test_data
+    predictions = model.predict(features)
+    return {
+        "accuracy": float(accuracy_score(labels, predictions)),
+        "precision_macro": float(precision_score(labels, predictions, average="macro")),
+        "recall_macro": float(recall_score(labels, predictions, average="macro")),
+        "f1_macro": float(f1_score(labels, predictions, average="macro")),
+    }
 
-    # summary = Summarizer.generate(long_message)
 
-    # assert len(summary) > 0
-    # assert len(summary) < len(long_message)
-    assert True  # Mock pass
+@pytest.mark.parametrize(
+    "metric, minimum",
+    [
+        ("accuracy", MIN_ACCURACY),
+        ("precision_macro", MIN_PRECISION_MACRO),
+        ("recall_macro", MIN_RECALL_MACRO),
+        ("f1_macro", MIN_F1_MACRO),
+    ],
+)
+def test_model_meets_minimum_metrics(
+    model_metrics: dict[str, float],
+    metric: str,
+    minimum: float,
+) -> None:
+    """Require minimum classification metrics on the full held-out test set."""
+    score = model_metrics[metric]
+    assert score >= minimum, (
+        f"Model {MODEL_NAME!r} has {metric}={score:.4f} on the held-out test set; "
+        f"minimum required is {minimum:.2f}."
+    )
