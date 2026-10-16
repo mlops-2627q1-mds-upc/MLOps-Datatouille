@@ -1,6 +1,6 @@
 **Engineering Decision Notebook (EDN) - Entry**
 
-**Milestone:** Other (Transversal M1–M3)
+**Milestone:** Other (Transversal M1-M3)
 
 **Activity / Topic (optional):** Documentation
 
