@@ -1,4 +1,4 @@
-**Engineering Decision Notebook (EDN) — Entry**
+**Engineering Decision Notebook (EDN) - Entry**
 
 **Milestone:** Other (Transversal M1–M3)
 
