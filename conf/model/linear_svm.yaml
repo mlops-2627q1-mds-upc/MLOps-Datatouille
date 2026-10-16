@@ -1,0 +1,6 @@
+name: linear_svm
+search_space:
+  C:
+    low: 0.01
+    high: 10.0
+    log: true

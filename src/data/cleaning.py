@@ -1,4 +1,5 @@
-"""Phase 1 of the pipeline: raw dataset -> cleaned dataset.
+"""
+Phase 1 of the pipeline: raw dataset -> cleaned dataset.
 
 Steps:
     1. Optionally anonymize email addresses and phone numbers in the text.
@@ -8,7 +9,7 @@ Steps:
     5. Remove duplicates on the cleaned text.
 
 Usage (from the root of the repo):
-    python -m src.data.phase_1_cleaning \
+    python -m src.data.cleaning \
         --input data/raw/raw.csv --output data/processed/clean.csv
 """
 
@@ -24,8 +25,30 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 logger = logging.getLogger(__name__)
 
 
-def preprocess_dataframe(df, text_col, label_col, emojis_as_text=False, anonymize=False):
-    """Optionally anonymize, then clean and engineer features for the dataset."""
+def preprocess_dataframe(
+    df: pd.DataFrame,
+    text_col: str,
+    label_col: str,
+    emojis_as_text: bool = False,
+    anonymize: bool = False,
+) -> pd.DataFrame:
+    """
+    Optionally anonymize, then clean and engineer features for the dataset.
+
+    Args:
+        df: Raw input dataframe with text and label columns.
+        text_col: Name of the text column.
+        label_col: Name of the label column.
+        emojis_as_text: If True, convert emojis to words instead of keeping them.
+        anonymize: If True, replace email addresses and phone numbers
+            with placeholders.
+
+    Returns:
+        Cleaned dataframe with count features and a `clean_text` column.
+
+    Raises:
+        KeyError: If the text or label columns are missing.
+    """
     missing = {text_col, label_col} - set(df.columns)
     if missing:
         raise KeyError(f"Columns {missing} not found. Columns in CSV: {list(df.columns)}")
@@ -50,7 +73,16 @@ def preprocess_dataframe(df, text_col, label_col, emojis_as_text=False, anonymiz
     return df
 
 
-def main():
+def main() -> None:
+    """
+    Clean the raw dataset and write the cleaned CSV.
+
+    Args:
+        None: Arguments are parsed from the command line.
+
+    Returns:
+        None.
+    """
     parser = argparse.ArgumentParser(
         description="Cleans and optionally anonymizes the raw dataset."
     )

@@ -1,4 +1,6 @@
-"""Regression tests for the trained spam-classification models."""
+"""
+Regression tests for the trained spam-classification models.
+"""
 
 import os
 
@@ -9,7 +11,7 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from sklearn.pipeline import Pipeline
 
 from src.config import DATA_DIR, MODELS_DIR
-from src.modeling.phase_3_training import load_xy
+from src.modeling.train import load_xy
 
 MODEL_NAMES = {"logreg", "naive_bayes", "linear_svm", "random_forest"}
 MODEL_NAME = os.environ.get("MODEL_NAME", "logreg")
@@ -74,7 +76,9 @@ def test_model_meets_minimum_metrics(
     metric: str,
     minimum: float,
 ) -> None:
-    """Require minimum classification metrics on the full held-out test set."""
+    """
+    Require minimum classification metrics on the full held-out test set.
+    """
     score = model_metrics[metric]
     assert score >= minimum, (
         f"Model {MODEL_NAME!r} has {metric}={score:.4f} on the held-out test set; "

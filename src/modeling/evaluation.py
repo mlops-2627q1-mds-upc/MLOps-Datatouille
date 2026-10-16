@@ -1,7 +1,8 @@
-"""Phase 4 of the pipeline: evaluation of a trained model on the held-out test set.
+"""
+Phase 4 of the pipeline: evaluation of a trained model on the held-out test set.
 
 Usage (from the root of the repo):
-    python -m src.modeling.phase_4_evaluation --model-path models/logreg.joblib \
+    python -m src.modeling.evaluation --model-path models/logreg.joblib \
         --test data/dataset/test.csv
 """
 
@@ -11,13 +12,22 @@ import logging
 import joblib
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-from src.modeling.phase_3_training import load_xy
+from src.modeling.train import load_xy
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
+    """
+    Evaluate a trained model on the held-out test set and log metrics.
+
+    Args:
+        None: Arguments are parsed from the command line.
+
+    Returns:
+        None.
+    """
     parser = argparse.ArgumentParser(description="Evaluates a trained model on the test set.")
     parser.add_argument("--model-path", required=True, help="Trained model (.joblib)")
     parser.add_argument("--test", required=True, help="Test CSV")
