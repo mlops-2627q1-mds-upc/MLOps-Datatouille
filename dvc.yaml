@@ -23,10 +23,6 @@ stages:
     deps:
       - ${data.clean}
       - src/data/gx_context_configuration.py
-      - gx/great_expectations.yml
-      - gx/expectations/processed_spam_dataset_suite.json
-      - gx/validation_definitions/processed_spam_dataset_validation.json
-      - gx/checkpoints/processed_spam_dataset_checkpoint.json
     outs:
       - data/processed/gx_validation.json
 
