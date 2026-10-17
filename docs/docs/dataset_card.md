@@ -21,7 +21,7 @@ tags:
 - text-classification
 - email
 source_datasets:
-- diegovelilla/email-classification-dataset
+- Deysi/spam-detection-dataset
 language_creators:
 - found
 annotations_creators:
@@ -43,13 +43,13 @@ This dataset contains 10,900 English messages for text classification tasks.
 The dataset is split into train (8,175 rows, 75%) and test (2,725 rows, 25%) splits. It 
 contains two columns: `text` (full message content) and `label` (binary label [spam, not_spam]).
 
-- **Curated by:** FIB-UPC MDS students, see [Dataset Card Contact](#dataset-card-contact). Source data by [diegovelilla](https://huggingface.co/datasets/diegovelilla/email-classification-dataset).
+- **Curated by:** FIB-UPC MDS students, see [Dataset Card Contact](#dataset-card-contact). Source data by [Deysi](https://huggingface.co/datasets/Deysi/spam-detection-dataset).
 - **Language(s) (NLP):** English
 - **License:** Apache-2.0
 
 ### Dataset Sources
 
-- **Original Repository:** https://huggingface.co/datasets/diegovelilla/email-classification-dataset
+- **Original Repository:** https://huggingface.co/datasets/Deysi/spam-detection-dataset
 
 Due to the original dataset lacking a dataset card, the sources that originated said dataset are unknown.
 
@@ -116,7 +116,7 @@ It was therefore republished under the team's account with a dataset card that d
 
 #### Data Collection and Processing
 
-The original dataset was sourced from [diegovelilla/spam-detection-dataset](https://huggingface.co/datasets/diegovelilla/email-classification-dataset) on Hugging Face, 
+The original dataset was sourced from [Deysi/spam-detection-dataset](https://huggingface.co/datasets/Deysi/spam-detection-dataset) on Hugging Face, 
 containing 10,900 English emails with binary spam/not_spam labels. 
 
 #### Who are the source data producers?
@@ -167,7 +167,7 @@ Users should be made aware of the risks, biases, and limitations of the dataset.
 
 > Aguilera, C., Bueno, A., Delgado, J., Torrents, B., & Velilla, D. (2026). Email Classification Dataset. Hugging Face. https://huggingface.co/datasets/diegovelilla/email-classification-dataset
 
-Users of this dataset should also acknowledge the source dataset, [diegovelilla/email-classification-dataset](https://huggingface.co/datasets/diegovelilla/email-classification-dataset).
+Users of this dataset should also acknowledge the source dataset, [Deysi/spam-detection-dataset](https://huggingface.co/datasets/Deysi/spam-detection-dataset).
 
 ## Glossary
 
