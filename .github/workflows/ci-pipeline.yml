@@ -33,11 +33,10 @@ jobs:
         run: |
           ruff check src tests
           ruff format --check src tests
-
+      
       - name: Run Unit and Integration Tests
-        # Tests that need DVC-tracked data or models run locally after dvc repro
         run: |
-          pytest tests/unit tests/integration -v -k "not test_processed_data"
+          pytest tests/unit tests/integration -v -k "not test_processed_data" --cov=src --cov-fail-under=80
 
       - name: Lightweight Data Validation (Sample)
         # Runs Great Expectations on a small sample to catch schema errors quickly

@@ -1,0 +1,23 @@
+import pytest
+from src.modeling.measure_co2 import _default_classifier, _cpu_model, _ram_total_gb, _gpu_model
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+
+def test_default_classifiers_alternatives():
+    assert isinstance(_default_classifier("naive_bayes"), MultinomialNB)
+    assert isinstance(_default_classifier("linear_svm"), LinearSVC)
+    assert isinstance(_default_classifier("random_forest"), RandomForestClassifier)
+    
+    with pytest.raises(ValueError, match="Unknown model"):
+        _default_classifier("unknown_model")
+
+def test_hardware_collection_does_not_crash():
+    # Hardware specs vary by OS, so we simply verify they run without 
+    # crashing to cover the nested try/except blocks.
+    assert isinstance(_cpu_model(), str)
+    
+    ram = _ram_total_gb()
+    assert isinstance(ram, (float, type(None)))
+    
+    assert isinstance(_gpu_model(), str)

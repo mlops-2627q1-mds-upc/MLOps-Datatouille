@@ -47,3 +47,6 @@ select = ["E", "W", "F", "I", "C90"]
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 force-sort-within-sections = true
+
+[tool.coverage.report]
+exclude_also = ['if __name__ == "__main__":']
