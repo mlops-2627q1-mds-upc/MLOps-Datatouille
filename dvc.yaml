@@ -103,15 +103,19 @@ stages:
         --model-path models/${item}.joblib
         --test ${split.test}
         --metrics-out reports/metrics/test/${item}.json
+        --features-out reports/features/${item}.json
         --label-col ${data.label_col}
       deps:
         - models/${item}.joblib
         - ${split.test}
         - src/modeling/train.py
         - src/modeling/evaluation.py
+        - src/modeling/explain.py
         - src/modeling/tracking.py
       params:
         - data.label_col
+      outs:
+        - reports/features/${item}.json
       metrics:
         - reports/metrics/test/${item}.json
 
