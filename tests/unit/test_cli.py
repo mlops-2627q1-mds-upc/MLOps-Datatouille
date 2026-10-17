@@ -60,9 +60,7 @@ def test_download_main(mock_download):
         "f.json",
     ],
 )
-def test_evaluation_main(
-    mock_compute, mock_stf, mock_sm, mock_smr, mock_lxy, mock_jload
-):
+def test_evaluation_main(mock_compute, mock_stf, mock_sm, mock_smr, mock_lxy, mock_jload):
     mock_lxy.return_value = (MagicMock(), MagicMock(), MagicMock())
     mock_compute.return_value = {"test_metric": 1.0}
     mock_smr.return_value.__enter__ = MagicMock(return_value=MagicMock())
