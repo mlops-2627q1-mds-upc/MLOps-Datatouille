@@ -50,8 +50,8 @@ git checkout branch-name
     * Never commit large files (.csv, .parquet, .pkl, .onnx, .pt) directly to Git.
     * Use DVC to track data dumps or model artifacts:
     ```bash
-    dvc add data/raw/spam_dataset.csv
-    git add data/raw/spam_dataset.csv.dvc data/raw/.gitignore
+    dvc repro         
+    git add dvc.lock
     dvc push
     ```
 
