@@ -1,12 +1,19 @@
 """
-Training stage of the pipeline: hyperparameter tuning and training with Hydra, Optuna, and MLflow.
+Training stage of the pipeline: Model training and hyperparameter evaluation.
 
-Each run tunes one model with a seeded Optuna study, refits the best hyperparameters on the
-whole train set, and writes the model plus the CV metrics of the best trial. MLflow runs are
-nested as DVC experiment > model > trial (see src.modeling.tracking).
+Workflow Orchestration:
+- DVC: Acts as the macro-orchestrator, triggering this pipeline stage and managing
+  the underlying data versioning and final artifact caching.
+- Hydra & Optuna: Hydra's multirun feature (using the Optuna sweeper plugin) manages
+  the hyperparameter search externally. Instead of looping internally, Hydra invokes
+  this script multiple times (once per trial), dynamically injecting a unique parameter
+  configuration into each execution.
+- MLflow: This script processes a single trial configuration per run, training the model
+  and logging the performance metrics alongside the dataset SHA-256 fingerprint.
 
-Usage (orchestrated by DVC):
-    python -m src.modeling.train model=logreg metrics_out=reports/metrics/train/logreg.json
+Usage (orchestrated by DVC and Hydra multirun):
+    python -m src.modeling.train --multirun model=logreg \
+        metrics_out=reports/metrics/train/logreg.json
 """
 
 import json

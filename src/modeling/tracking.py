@@ -1,12 +1,20 @@
-"""MLflow tracking for the training stage.
+"""
+MLflow tracking module for the training stage.
 
-One DVC experiment (``dvc exp run``) maps to one MLflow parent run, and each model trained by
-the ``train`` foreach stage logs a nested child run under it. Every ``train@<model>`` stage is
-a separate process, so the parent run is looked up by tags and reused instead of recreated.
-Parent and child runs record the DVC experiment name, git ref and restore commands, so a
-run can be reproduced from the MLflow UI with ``dvc exp pull`` + ``dvc exp apply``.
-The parent run also holds the emissions of the whole experiment: one CSV with every
-measurement of every model, and its totals.
+This module encapsulates all MLflow API interactions, establishing a strict reproducibility
+link between DVC's immutable data states and MLflow's runtime metrics.
+
+Run Hierarchy:
+- Experiment: The top-level logical grouping (e.g., `spam-classifier`) for all candidate models.
+- Parent Run: Represents a specific model architecture (e.g., `logreg`). It captures the Git
+  commit hash, logs the training dataset's SHA-256 hash (via MLflow's Data API),
+  and handles the final registration of the optimal model artifact.
+- Nested Child Runs: Represent the individual Optuna hyperparameter trials executed by Hydra.
+  Each child run logs its specific parameter configuration and resulting cross-validation
+  metrics cleanly under the parent run.
+
+By capturing the dataset digest and Git code state in the parent run, any model registered
+in the MLflow UI can be exactly reproduced using DVC and Git.
 """
 
 from collections.abc import Iterator
