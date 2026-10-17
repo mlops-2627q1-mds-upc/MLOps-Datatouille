@@ -33,16 +33,10 @@ jobs:
         run: |
           ruff check src tests
           ruff format --check src tests
-
+      
       - name: Run Unit and Integration Tests
-        # Tests that need DVC-tracked data or models run locally after dvc repro
         run: |
-          pytest tests/unit tests/integration -v -k "not test_processed_data"
-
-      - name: Lightweight Data Validation (Sample)
-        # Runs Great Expectations on a small sample to catch schema errors quickly
-        run: |
-          echo "Executing Great Expectations against a 100-row sample of Deysi/spam-detection-dataset"
+          pytest tests/unit tests/integration -v -k "not test_processed_data" --cov=src --cov-fail-under=80
 
   # JOB 2: DEV -> MAIN
   comprehensive-validation:
@@ -73,14 +67,22 @@ jobs:
           pip install pytest great_expectations fastapi httpx
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Full Data Pipeline Validation
-        # Validates the entire dataset before allowing model integration
+      - name: Configure DVC remote credentials
         run: |
-          echo "Executing Great Expectations against the full Deysi/spam-detection-dataset"
-
-      - name: Run Automated Regression Tests (Model & Integration)
-        # Runs the heavy regression suite to ensure model performance hasn't degraded
+          dvc remote modify origin --local access_key_id ${{ secrets.DAGSHUB_USER }}
+          dvc remote modify origin --local secret_access_key ${{ secrets.DAGSHUB_TOKEN }}
+          
+      - name: Pull data and models
+        run: dvc pull
+        
+      - name: Full data validation (Great Expectations)
+        run: python -m src.data.gx_context_configuration
+        
+      - name: Model regression and robustness tests
         run: |
-          pytest tests/regression/ -v
-          pytest tests/integration/ -v
-          pytest tests/unit/ -v
+          for model in logreg naive_bayes linear_svm random_forest; do
+            MODEL_NAME="$model" pytest -q tests/regression/ || exit 1
+          done
+          
+      - name: Unit and integration tests
+        run: pytest tests/unit tests/integration -v
