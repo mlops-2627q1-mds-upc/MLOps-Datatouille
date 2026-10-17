@@ -73,7 +73,7 @@ jobs:
           dvc remote modify origin --local secret_access_key ${{ secrets.DAGSHUB_TOKEN }}
           
       - name: Pull data and models
-        run: run: dvc pull
+        run: dvc pull
         
       - name: Full data validation (Great Expectations)
         run: python -m src.data.gx_context_configuration
