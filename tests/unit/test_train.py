@@ -90,4 +90,3 @@ def test_trials_nest_under_model_run(
     assert {r.data.tags["mlflow.parentRunId"] for r in trials} == {model_run.info.run_id}
     assert sorted(r.info.run_name for r in trials)[0] == "trial-0"
     assert resumed_run.info.run_id == model_run.info.run_id
-    
