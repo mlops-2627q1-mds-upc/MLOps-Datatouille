@@ -1,8 +1,10 @@
 """Unit tests for the training stage (Optuna study and MLflow nesting)."""
 
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import contextmanager
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -15,6 +17,13 @@ from src.modeling import train
 from src.modeling.tracking import RUN_ROLE_TAG, start_model_run
 
 EXPERIMENT = "test-experiment"
+FAKE_RECORD = {"project_name": "fake", "duration": 2.0, "energy_consumed": 0.5, "emissions": 0.1}
+
+
+@contextmanager
+def fake_track_emissions(*args: object, **kwargs: object) -> Iterator[SimpleNamespace]:
+    """Stand-in for ``track_emissions`` yielding a stopped tracker with a fixed measurement."""
+    yield SimpleNamespace(final_emissions_data=SimpleNamespace(values=dict(FAKE_RECORD)))
 
 
 @pytest.fixture
@@ -33,8 +42,8 @@ def cfg() -> DictConfig:
 
 @pytest.fixture
 def xy(monkeypatch: pytest.MonkeyPatch) -> tuple[pd.DataFrame, pd.Series]:
-    """Tiny dataset, with emissions tracking disabled so tests stay fast and offline."""
-    monkeypatch.setattr(train, "track_emissions", lambda stage: nullcontext())
+    """Tiny dataset, with emissions tracking faked so tests stay fast and offline."""
+    monkeypatch.setattr(train, "track_emissions", fake_track_emissions)
     texts = ["win free prize now", "are we meeting today", "claim reward", "see you later"]
     labels = ["spam", "ham", "spam", "ham"]
     x = pd.DataFrame({train.TEXT_COL: texts * 3, "n_words": [4, 4, 2, 3] * 3})
@@ -68,7 +77,7 @@ def test_best_trial_keeps_all_cv_metrics(tracking_uri: str, cfg: DictConfig, xy:
     """The best trial stores every CV metric, not only the tuned one."""
     x, y = xy
     mlflow.set_experiment(EXPERIMENT)
-    _, metrics = train.train_and_evaluate(cfg, x, y, ["n_words"])
+    _, metrics, _ = train.train_and_evaluate(cfg, x, y, ["n_words"])
     assert set(metrics) == {f"cv_{name}" for name in train.SCORING} | {"cv_f1_macro_std"}
 
 
@@ -90,3 +99,36 @@ def test_trials_nest_under_model_run(
     assert {r.data.tags["mlflow.parentRunId"] for r in trials} == {model_run.info.run_id}
     assert sorted(r.info.run_name for r in trials)[0] == "trial-0"
     assert resumed_run.info.run_id == model_run.info.run_id
+
+
+def test_emission_rows_cover_every_trial_and_final_fit(
+    tracking_uri: str, cfg: DictConfig, xy: tuple
+) -> None:
+    """Training returns one labelled measurement per trial plus one for the final fit."""
+    mlflow.set_experiment(EXPERIMENT)
+    x, y = xy
+    _, _, rows = train.train_and_evaluate(cfg, x, y, ["n_words"])
+    assert [row["step"] for row in rows] == ["trial-0", "trial-1", "trial-2", "final"]
+    assert {row["model"] for row in rows} == {"naive_bayes"}
+    assert all(row["emissions"] == FAKE_RECORD["emissions"] for row in rows)
+
+
+def test_emission_metric_names_do_not_depend_on_model(
+    tracking_uri: str, cfg: DictConfig, xy: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Emission metrics share names across models, so MLflow can plot them together."""
+    prefixes = []
+
+    @contextmanager
+    def recording_track_emissions(
+        stage: str, metric_prefix: str | None = None
+    ) -> Iterator[SimpleNamespace]:
+        prefixes.append(metric_prefix or stage)
+        with fake_track_emissions() as tracker:
+            yield tracker
+
+    monkeypatch.setattr(train, "track_emissions", recording_track_emissions)
+    mlflow.set_experiment(EXPERIMENT)
+    x, y = xy
+    train.train_and_evaluate(cfg, x, y, ["n_words"])
+    assert set(prefixes) == {"train_trial", "train_final"}

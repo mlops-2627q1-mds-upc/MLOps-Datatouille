@@ -4,6 +4,7 @@
 |---|---|
 | **Scope** | How the team measures, stores and reports the energy consumption and CO2 emissions of the pipeline stages (Milestone 3, energy efficiency awareness). |
 | **Out of scope** | Continuous resource monitoring of the deployed API (Milestone 6, Prometheus and Grafana), and the final choice of model, which is decided in experimentation. |
+| **Revisions** | 2026-10-17 (#91, #96): training is now tracked per Optuna trial and per final fit, MLflow metric names no longer contain the model name, the cumulative CSV is no longer uploaded to every run, and each model run and DVC experiment logs its total training emissions (sections 5.2, 5.7, 5.8, 6.1). |
 
 Official documentation: <https://docs.codecarbon.io/latest/>
 
@@ -62,7 +63,7 @@ adds the tracker when writing the real code (section 6).
 | CodeCarbon 3.x keeps the `OfflineEmissionsTracker` API used by the helper. | verified (3.3.1) | `requirements.txt` pins `codecarbon>=3.0`. Pin an exact version if a later release breaks it. |
 | The `experiment_name` argument is **not** written to the CSV in 3.3.1, so the stage is stored in `project_name` as `mlops-datatouille-<stage>`. | verified (3.3.1) | If a later version writes it, nothing breaks, the stage simply also appears there. |
 | Hardware power sensors are available (Intel RAPL on Linux, NVIDIA NVML for GPUs). | unknown, depends on each laptop | CodeCarbon falls back to an estimate based on the CPU's TDP. This happens on most macOS and Windows laptops and inside some VMs. The startup log says which method was used, and the report states it as a limitation. |
-| MLflow is installed and a run is active when `track_emissions` is called. | assumed (MLflow is not yet in `requirements.txt`) | The helper skips MLflow logging silently. The CSV and the log line are still produced. |
+| MLflow is installed and a run is active when `track_emissions` is called. | verified (`mlflow` is pinned in `requirements.txt`; training opens the runs, section 5.7) | The helper skips MLflow logging silently. The CSV and the log line are still produced. |
 | The team logs to a common MLflow server. | unknown (`infra/mlflow/` is a local Docker server per laptop) | Each member only sees their own runs. The final comparisons are run by one person on one machine, so the report is not affected. |
 | Spain's average grid carbon intensity is representative of where the code runs. | assumed | If code runs elsewhere (e.g. Colab in another region), change `CODECARBON_COUNTRY_ISO_CODE` for those runs and state it in the report. |
 
@@ -81,10 +82,12 @@ adds the tracker when writing the real code (section 6).
 | `requirements.txt` | edited (setup PR) | Adds `codecarbon>=3.0`. Everyone, including the CI runner, installs it with `pip install -r requirements.txt`. |
 | `src/config.py` | edited (setup PR) | Adds `EMISSIONS_DIR` (`reports/emissions/`) and the `CODECARBON_*` constants. |
 | `src/emissions.py` | new (setup PR) | Provides `track_emissions(stage)`, the only function the team calls. |
-| `tests/unit/test_emissions.py` | new (setup PR) | Checks that a CSV row is written, including when the wrapped code crashes. |
+| `tests/unit/test_emissions.py` | new (setup PR), extended (#91, #96) | Checks that a CSV row is written, including when the wrapped code crashes, the MLflow metric names, that the cumulative CSV is not uploaded, and the totals. |
 | `reports/emissions/.gitkeep` | new (setup PR) | Keeps the empty folder in Git, since Git does not track empty folders. |
 | `.gitignore` | edited (setup PR) | Ignores `reports/emissions/*.csv`. |
-| `src/features.py`, `src/modeling/train.py`, `src/modeling/predict.py` | pending (stage owners) | Wrap the relevant block with `track_emissions(...)` (section 6). |
+| `src/modeling/train.py` | done (#44, #91, #96) | Tracks each Optuna trial and the final fit, and logs the training totals (sections 5.7 and 6.1). |
+| `src/modeling/tracking.py` | edited (#96) | Builds the emissions table and totals of each DVC experiment on its MLflow parent run (section 5.7). |
+| `src/features.py`, `src/modeling/predict.py` | pending (stage owners) | Wrap the relevant block with `track_emissions(...)` (section 6). |
 
 Flow of one measurement:
 
@@ -95,30 +98,40 @@ with track_emissions("train"):        # start tracker
                                       #   1. stop tracker, compute kWh and kg CO2eq
                                       #   2. append row to reports/emissions/emissions.csv
                                       #   3. print log line
-                                      #   4. if MLflow run active: log metrics + CSV artifact
+                                      #   4. if MLflow run active: log metrics
+                                      #      (the cumulative CSV is not uploaded)
 ```
 
 ### 5.2 Shared helper `src/emissions.py`
 
-**What it does.** The module has four functions.
+**What it does.** The module has six functions.
 
 - `build_tracker(stage)` creates an `OfflineEmissionsTracker` with the settings from
   `src/config.py`. `stage` is a label (e.g. `"features"`, `"train"`, `"evaluate"`,
   `"predict"`) stored in the CSV `project_name` column as `mlops-datatouille-<stage>`.
 - `emissions_summary(tracker)` extracts the three figures that matter from a stopped tracker:
   duration (s), energy (kWh) and emissions (kg CO2eq).
-- `_log_to_mlflow(...)` logs those figures to the active MLflow run as `<stage>_duration_s`,
-  `<stage>_energy_consumed_kwh` and `<stage>_emissions_kg_co2eq`, and attaches the CSV as an
-  artifact under `emissions/`. If MLflow is not installed or no run is active, it does nothing.
-- `track_emissions(stage)` is a context manager. It starts the tracker, runs the wrapped block,
-  then stops the tracker, writes the CSV row, prints a log line such as
+- `emissions_record(tracker)` returns the full measurement of a stopped tracker as one CSV row
+  (same columns as `emissions.csv`), so a caller can log only its own rows.
+- `total_emissions(records, prefix)` sums duration, energy and emissions over several rows, e.g.
+  all the trials of a model.
+- `_log_to_mlflow(...)` logs the figures to the active MLflow run as `<prefix>_duration_s`,
+  `<prefix>_energy_consumed_kwh` and `<prefix>_emissions_kg_co2eq`. If no run is active, it
+  does nothing. It does **not** attach `emissions.csv`: that file accumulates every measurement
+  ever made on the machine, so attaching it would upload the whole history to every run.
+- `track_emissions(stage, metric_prefix=None)` is a context manager. It starts the tracker,
+  runs the wrapped block, then stops the tracker, writes the CSV row, prints a log line such as
   `[train] 0.0021 kWh, 0.00036 kg CO2eq in 412.3 s`, and logs to MLflow. A `try/finally`
-  guarantees that the measurement is saved even if the wrapped code crashes.
+  guarantees that the measurement is saved even if the wrapped code crashes. `metric_prefix`
+  sets the MLflow metric names and defaults to `stage`. It exists because `stage` may contain
+  run-specific parts: training uses `stage="train_final_<model>"` so the CSV can tell models
+  apart, but `metric_prefix="train_final"` so every model logs the same metric names.
 
 **Why.** One helper avoids each member configuring CodeCarbon differently, which would make
 results incomparable. The `stage` label lets the same code be reused anywhere and keeps the
 CSV rows and MLflow metrics of each stage apart. Using CodeCarbon only for training is valid,
-since `stage` is just a label.
+since `stage` is just a label. MLflow only plots metrics with the same name in one chart, so
+metric names must not depend on the model (#91).
 
 **Cost.** One extra dependency and one small module. The tracker runs a background sampler, so
 it adds a negligible overhead to the measured block.
@@ -178,7 +191,8 @@ and can be opened. `reports/emissions/.gitkeep` keeps the folder in the reposito
   same CSV, every PR conflicts on that file.
 - Each row depends on the machine that ran it. A shared file would mix different machines in
   one table.
-- The useful figures already go to MLflow, together with the quality metrics of each run.
+- The useful figures already go to MLflow, together with the quality metrics of each run. The
+  rows of each DVC experiment are also uploaded there as one table (section 5.7).
 
 **Cost.** Raw measurements of other members are only visible through MLflow, and only if the
 team uses a common MLflow server (section 5.7). If the team wants
@@ -194,23 +208,41 @@ project. It only writes a temporary lock file in the system temp folder
 **What it does.** When `track_emissions` runs **inside** `mlflow.start_run(...)`, the energy and
 emission metrics are stored in the same run as the parameters and quality metrics.
 
+Training runs as `dvc exp run`, which logs a tree of MLflow runs (see
+`docs/docs/experiment-tracking.md`): one parent run per DVC experiment, one run per model, and
+one run per Optuna trial. Emissions are logged at every level, where `*` is `duration_s`,
+`energy_consumed_kwh` and `emissions_kg_co2eq`:
+
+| Run | Metrics | Artifact |
+|---|---|---|
+| Experiment (parent) | `train_*`: total of all models trained in the experiment | `emissions/emissions.csv`: one row per trial and final fit of every model, with `model` and `step` columns |
+| Model | `train_*`: all trials + final fit; `train_final_*`: final fit only | none |
+| Trial | `train_trial_*`: that trial's cross-validation | none |
+
+Each `train@<model>` DVC stage is a separate process, so the parent's table is rebuilt by each
+one in turn: it replaces its own model's rows and recomputes the parent's totals from the table.
+Models whose training DVC skipped (cached) spent no energy in that experiment, so they are not
+in its total. Outside `dvc exp run` (e.g. `dvc repro`) there is no parent run, and the model run
+gets its own table.
+
 **Why.** MLflow's *Compare runs* view then gives a ready-made table and a scatter plot of F1 vs.
-energy for the report, without extra code.
+energy for the report, without extra code. The model run must hold the **whole** training cost:
+tuning trials are most of it (e.g. 10 random forest trials took ~60 s, the final fit ~1.5 s), so
+a model run with only the final fit would compare a few percent of the real cost.
 
 **Cost.** Order matters. If `track_emissions` is called outside an MLflow run, the metrics only
 go to the local CSV. MLflow is only shared if everyone logs to the same server. The current
 `infra/mlflow/` setup runs a local Docker server on each laptop, so each member only sees their
 own runs. This is not a problem for the report, because valid comparisons must come from one
 machine anyway (section 4). If the team deploys a common server (e.g. on the FIB VM), every
-member sees every run. MLflow is imported only if installed, so the helper does not add MLflow as a
-hard dependency.
+member sees every run.
 
 ### 5.8 Which stages are measured
 
 | Stage | Label | Priority | Reason |
 |---|---|---|---|
-| Training (`src/modeling/train.py`) | `train` | **mandatory** | The minimum required by Milestone 3. Only the fitting step is wrapped, so data loading and evaluation do not inflate it. |
-| Evaluation (`src/modeling/train.py`) | `evaluate` | recommended | Keeps the cost of evaluating separate from the cost of fitting. |
+| Training (`src/modeling/train.py`) | `train_trial_<model>`, `train_final_<model>` (MLflow prefixes `train_trial`, `train_final`; totals `train`) | **mandatory**, done | The minimum required by Milestone 3. Only the cross-validation of each Optuna trial and the final fit are wrapped, so data loading and evaluation do not inflate it. |
+| Evaluation (`src/modeling/evaluation.py`) | `evaluate` | recommended | Keeps the cost of evaluating separate from the cost of fitting. |
 | Feature extraction (`src/features.py`) | `features` | recommended | If embeddings from a pretrained model are computed, this step can cost more than training the classifier. Without measuring it, that cost stays hidden. |
 | Batch inference (`src/modeling/predict.py`) | `predict` | recommended | Training happens once, but the deployed model predicts on every email. Energy per 1,000 predictions is the recurring production cost, which dominates over time. It is also where a light model usually beats a transformer by far. |
 | API (`src/api/`, Milestone 4) | none | **not tracked per request** | Per-request tracking adds latency and measures almost nothing. The batch inference figure is used instead, or a load test (e.g. 1,000 requests) is run under `codecarbon monitor` (section 6.5). |
@@ -223,12 +255,14 @@ hard dependency.
   written with `project_name = mlops-datatouille-unit-test`, country `ESP`, and non-negative
   emissions and energy. The second checks that the row is still written when the wrapped block
   raises an error. Both write to a temporary folder (`tmp_path`), so they leave no CSV in the
-  repository.
-- Every final training run in MLflow has the three `train_*` emission metrics.
+  repository. Further tests cover the metric names, that the cumulative CSV is not uploaded,
+  and the totals, and `tests/unit/test_tracking.py` covers the experiment table on the parent run.
+- Every model run in MLflow has the three `train_*` emission metrics (trials + final fit), and
+  every DVC experiment's parent run has their total.
 - The report contains the results table, the decision and the limitations listed below.
 
 **Method.** No dedicated experiments are needed. The models compared during experimentation
-are already trained inside MLflow runs, and `track_emissions("train")` adds their energy and
+are already trained inside MLflow runs, and the training tracking adds their energy and
 emissions next to their F1. The comparison for the report therefore comes from those same runs.
 All runs used in the comparison are executed on the same machine.
 
@@ -265,10 +299,26 @@ hours used, compute region, carbon emitted), following the Hugging Face model ca
 Whoever writes the real code of each stage adds the tracker **in that same branch**, so nobody
 touches the file twice and there are no merge conflicts.
 
-### 6.1 Training (`src/modeling/train.py`), mandatory
+### 6.1 Training (`src/modeling/train.py`), mandatory, done
 
-Wrap **only the fitting step** with `track_emissions("train")`, inside the MLflow run. Evaluation
-is tracked as a separate stage so each cost is visible.
+Implemented (#44, #91, #96). With Optuna tuning, training has two costly steps, and each one is
+wrapped inside its MLflow run:
+
+```python
+# each Optuna trial, inside the trial run
+with track_emissions(f"train_trial_{model}", metric_prefix="train_trial") as tracker:
+    scores = cross_validate(pipeline, X, y, cv=cv, scoring=SCORING)
+
+# the final fit with the best hyperparameters, inside the model run
+with track_emissions(f"train_final_{model}", metric_prefix="train_final") as tracker:
+    final_pipeline.fit(X, y)
+```
+
+Each step's `emissions_record(tracker)` is kept, summed into the model run's `train_*` metrics
+with `total_emissions`, and merged into the experiment's table on the parent run
+(`log_emissions` in `src/modeling/tracking.py`). The original generic example, still valid for
+other stages, wraps only the fitting step, inside the MLflow run, and tracks evaluation as a
+separate stage so each cost is visible:
 
 ```python
 import mlflow
@@ -321,10 +371,10 @@ with track_emissions("predict") as tracker:
 # per-message cost = tracker.final_emissions_data.energy_consumed / len(X)
 ```
 
-### 6.4 MLflow dependency
+### 6.4 MLflow dependency, done
 
-MLflow is not yet in `requirements.txt`. Whoever adds experiment tracking adds it there, so the
-MLflow logging of section 5.7 is active for everyone.
+`mlflow` is pinned in `requirements.txt`, so the MLflow logging of section 5.7 is active for
+everyone.
 
 ### 6.5 Zero-code alternative (notebooks, quick tests, API load tests)
 
