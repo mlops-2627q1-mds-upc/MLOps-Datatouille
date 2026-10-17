@@ -34,7 +34,7 @@ def cfg() -> DictConfig:
 @pytest.fixture
 def xy(monkeypatch: pytest.MonkeyPatch) -> tuple[pd.DataFrame, pd.Series]:
     """Tiny dataset, with emissions tracking disabled so tests stay fast and offline."""
-    monkeypatch.setattr(train, "track_emissions", lambda stage: nullcontext())
+    monkeypatch.setattr(train, "track_emissions", lambda *args, **kwargs: nullcontext())
     texts = ["win free prize now", "are we meeting today", "claim reward", "see you later"]
     labels = ["spam", "ham", "spam", "ham"]
     x = pd.DataFrame({train.TEXT_COL: texts * 3, "n_words": [4, 4, 2, 3] * 3})

@@ -169,7 +169,7 @@ def run_study(
                 n_splits=cfg.train.cv_folds, shuffle=True, random_state=cfg.train.random_state
             )
 
-            with track_emissions(f"train_trial_{cfg.model.name}"):
+            with track_emissions(f"train_trial_{cfg.model.name}", metric_prefix="train_trial"):
                 scores = cross_validate(pipeline, X, y, cv=cv, scoring=SCORING)
 
             metrics = {
@@ -211,7 +211,7 @@ def train_and_evaluate(
     )
     final_pipeline = build_pipeline(best_classifier, count_columns, cfg.train.max_features)
 
-    with track_emissions(f"train_final_{cfg.model.name}"):
+    with track_emissions(f"train_final_{cfg.model.name}", metric_prefix="train_final"):
         final_pipeline.fit(X, y)
 
     return final_pipeline, study.best_trial.user_attrs[CV_METRICS_ATTR]

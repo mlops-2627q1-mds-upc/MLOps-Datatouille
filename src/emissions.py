@@ -69,17 +69,17 @@ def emissions_summary(tracker: OfflineEmissionsTracker) -> dict[str, float]:
     }
 
 
-def _log_to_mlflow(stage: str, summary: dict[str, float], csv_path: Path) -> None:
+def _log_to_mlflow(prefix: str, summary: dict[str, float], csv_path: Path) -> None:
     """Log the emission figures to the active MLflow run, if there is one.
 
     Args:
-        stage: Pipeline stage name, used as metric prefix.
+        prefix: Metric name prefix, e.g. "train_final" -> "train_final_duration_s".
         summary: Output of `emissions_summary`.
         csv_path: Path to the CodeCarbon CSV, logged as an artifact.
     """
     if mlflow.active_run() is None:
         return
-    mlflow.log_metrics({f"{stage}_{key}": value for key, value in summary.items()})
+    mlflow.log_metrics({f"{prefix}_{key}": value for key, value in summary.items()})
     mlflow.log_artifact(str(csv_path), artifact_path="emissions")
 
 
@@ -88,17 +88,22 @@ def track_emissions(
     stage: str,
     output_dir: Path = EMISSIONS_DIR,
     measure_power_secs: float | None = None,
+    metric_prefix: str | None = None,
 ) -> Iterator[OfflineEmissionsTracker]:
     """Measure energy and CO2 of the wrapped block and record the result.
 
     The result is appended to `<output_dir>/emissions.csv` and, if an MLflow
-    run is active, logged as `<stage>_*` metrics plus the CSV as artifact.
+    run is active, logged as `<metric_prefix>_*` metrics plus the CSV as artifact.
 
     Args:
         stage: Pipeline stage name (e.g. "features", "train", "predict").
         output_dir: Directory where `emissions.csv` is appended.
         measure_power_secs: Power sampling interval override. Defaults to
             `CODECARBON_MEASURE_POWER_SECS`.
+        metric_prefix: Prefix of the MLflow metric names. Defaults to `stage`.
+            Set it when `stage` holds run-specific parts (e.g. the model name)
+            that would give each run different metric names, so runs could
+            not be compared in the same MLflow plot.
 
     Yields:
         The running tracker (useful for `start_task` / `stop_task`).
@@ -114,4 +119,4 @@ def track_emissions(
             f"[{stage}] {summary['energy_consumed_kwh']:.3g} kWh, "
             f"{summary['emissions_kg_co2eq']:.3g} kg CO2eq in {summary['duration_s']:.1f} s"
         )
-        _log_to_mlflow(stage, summary, output_dir / EMISSIONS_FILE)
+        _log_to_mlflow(metric_prefix or stage, summary, output_dir / EMISSIONS_FILE)
