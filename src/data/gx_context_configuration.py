@@ -74,6 +74,7 @@ def build_expectations():
         gxe.ExpectColumnValuesToNotBeNull(column=CLEAN_TEXT_COL),
         gxe.ExpectColumnValuesToBeOfType(column=CLEAN_TEXT_COL, type_="str"),
         gxe.ExpectColumnValueLengthsToBeBetween(column=CLEAN_TEXT_COL, min_value=1),
+        gxe.ExpectColumnValuesToBeUnique(column=CLEAN_TEXT_COL),
         gxe.ExpectColumnValuesToNotBeNull(column=LABEL_COL),
         gxe.ExpectColumnValuesToBeOfType(column=LABEL_COL, type_="str"),
         gxe.ExpectColumnValuesToBeInSet(column=LABEL_COL, value_set=LABELS),
