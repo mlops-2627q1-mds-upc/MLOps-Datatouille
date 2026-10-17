@@ -10,6 +10,8 @@ from src.emissions import EMISSIONS_FILE, emissions_record, total_emissions, tra
 
 SUMMARY_KEYS = {"duration_s", "energy_consumed_kwh", "emissions_kg_co2eq"}
 
+SUMMARY_KEYS = {"duration_s", "energy_consumed_kwh", "emissions_kg_co2eq"}
+
 
 def _read_rows(csv_path: Path) -> list[dict[str, str]]:
     """Read the CodeCarbon CSV as a list of row dicts."""
