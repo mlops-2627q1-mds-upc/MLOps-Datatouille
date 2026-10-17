@@ -43,6 +43,7 @@ def test_download_main(mock_download):
 @patch("src.modeling.evaluation.start_model_run")
 @patch("src.modeling.evaluation.save_metrics")
 @patch("src.modeling.evaluation.save_top_features")
+@patch("src.modeling.evaluation.compute_test_metrics")
 @patch(
     "sys.argv",
     [
@@ -59,8 +60,11 @@ def test_download_main(mock_download):
         "f.json",
     ],
 )
-def test_evaluation_main(mock_stf, mock_sm, mock_smr, mock_lxy, mock_jload):
+def test_evaluation_main(
+    mock_compute, mock_stf, mock_sm, mock_smr, mock_lxy, mock_jload
+):
     mock_lxy.return_value = (MagicMock(), MagicMock(), MagicMock())
+    mock_compute.return_value = {"test_metric": 1.0}
     mock_smr.return_value.__enter__ = MagicMock(return_value=MagicMock())
     mock_smr.return_value.__exit__ = MagicMock()
     eval_main()
@@ -88,5 +92,6 @@ def test_evaluation_main(mock_stf, mock_sm, mock_smr, mock_lxy, mock_jload):
 def test_selection_main(mock_build, mock_select, mock_load, mock_dvc):
     mock_dvc.return_value = {"train": {"models": ["m1"]}}
     mock_select.return_value = ("m1", 0.9)
+    mock_build.return_value = {"model": "m1"}
     selection_main()
     mock_build.assert_called_once()
