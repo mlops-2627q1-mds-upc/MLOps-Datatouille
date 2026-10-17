@@ -20,7 +20,6 @@ from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 import pandas as pd
 
-PARENT_RUN_SUFFIX = "train"
 EXP_NAME_TAG = "dvc.exp_name"
 BASELINE_REV_TAG = "dvc.baseline_rev"
 EXP_REF_TAG = "dvc.exp_ref"
@@ -39,19 +38,6 @@ def get_dvc_exp_context() -> tuple[str | None, str | None]:
         Tuple ``(exp_name, baseline_rev)``. Each is None outside ``dvc exp run``.
     """
     return os.getenv("DVC_EXP_NAME") or None, os.getenv("DVC_EXP_BASELINE_REV") or None
-
-
-def build_run_name(prefix: str | None, suffix: str) -> str:
-    """Build an MLflow run name prefixed by the DVC experiment name.
-
-    Args:
-        prefix: DVC experiment name, or None when not running under ``dvc exp run``.
-        suffix: Run-specific part of the name (e.g. the model name).
-
-    Returns:
-        ``"<prefix>-<suffix>"``, or ``suffix`` alone when there is no prefix.
-    """
-    return f"{prefix}-{suffix}" if prefix else suffix
 
 
 def build_exp_ref(exp_name: str, baseline_rev: str) -> str:
@@ -215,7 +201,7 @@ def find_or_create_parent_run(
 
     run = client.create_run(
         experiment_id,
-        run_name=build_run_name(exp_name, PARENT_RUN_SUFFIX),
+        run_name=exp_name,
         tags=build_exp_tags(exp_name, baseline_rev, "parent"),
     )
     return run.info.run_id
@@ -253,7 +239,7 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
         child_args = {"run_id": child_id}
     else:
         child_args = {
-            "run_name": build_run_name(exp_name, model_name),
+            "run_name": model_name,
             "tags": build_exp_tags(exp_name, baseline_rev, "child") | {MODEL_TAG: model_name},
         }
     with mlflow.start_run(run_id=parent_id), mlflow.start_run(nested=True, **child_args) as run:
@@ -273,9 +259,8 @@ def start_trial_run(model_name: str, trial_number: int) -> Run:
     Returns:
         The started MLflow run, usable as a context manager.
     """
-    exp_name, _ = get_dvc_exp_context()
     return mlflow.start_run(
-        run_name=build_run_name(exp_name, f"{model_name}-trial-{trial_number}"),
+        run_name=f"trial-{trial_number}",
         nested=True,
         tags={RUN_ROLE_TAG: "trial", MODEL_TAG: model_name},
     )
