@@ -88,5 +88,5 @@ def test_trials_nest_under_model_run(
     trials = client.search_runs([experiment_id], f"tags.{RUN_ROLE_TAG} = 'trial'")
     assert len(trials) == cfg.train.n_trials
     assert {r.data.tags["mlflow.parentRunId"] for r in trials} == {model_run.info.run_id}
-    assert sorted(r.info.run_name for r in trials)[0] == "my-exp-naive_bayes-trial-0"
+    assert sorted(r.info.run_name for r in trials)[0] == "trial-0"
     assert resumed_run.info.run_id == model_run.info.run_id

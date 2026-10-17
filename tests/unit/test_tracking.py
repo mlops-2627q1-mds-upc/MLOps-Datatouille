@@ -14,7 +14,6 @@ from src.modeling.tracking import (
     RUN_ROLE_TAG,
     build_exp_ref,
     build_exp_tags,
-    build_run_name,
     file_md5,
     log_dataset,
     start_model_run,
@@ -28,12 +27,6 @@ def _runs(uri: str) -> list:
     client = MlflowClient(uri)
     experiment = client.get_experiment_by_name(EXPERIMENT)
     return client.search_runs([experiment.experiment_id])
-
-
-def test_build_run_name_with_and_without_prefix() -> None:
-    """Run names get the DVC experiment prefix only when there is one."""
-    assert build_run_name("exp-1", "logreg") == "exp-1-logreg"
-    assert build_run_name(None, "logreg") == "logreg"
 
 
 def test_build_exp_ref_matches_dvc_format() -> None:
@@ -78,9 +71,9 @@ def test_runs_share_one_parent_under_dvc_exp(
     parents = [r for r in runs if r.data.tags[RUN_ROLE_TAG] == "parent"]
     children = [r for r in runs if r.data.tags[RUN_ROLE_TAG] == "child"]
     assert len(parents) == 1
-    assert parents[0].info.run_name == "my-exp-train"
+    assert parents[0].info.run_name == "my-exp"
     assert parents[0].info.status == "FINISHED"
-    assert sorted(r.info.run_name for r in children) == ["my-exp-logreg", "my-exp-naive_bayes"]
+    assert sorted(r.info.run_name for r in children) == ["logreg", "naive_bayes"]
     assert {r.data.tags["mlflow.parentRunId"] for r in children} == {parents[0].info.run_id}
     assert {r.data.tags[EXP_REF_TAG] for r in runs} == {"refs/exps/ab/c123/my-exp"}
 
@@ -93,7 +86,7 @@ def test_new_dvc_exp_gets_new_parent(tracking_uri: str, monkeypatch: pytest.Monk
             pass
 
     parents = [r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "parent"]
-    assert sorted(r.info.run_name for r in parents) == ["exp-a-train", "exp-b-train"]
+    assert sorted(r.info.run_name for r in parents) == ["exp-a", "exp-b"]
 
 
 def test_standalone_run_outside_dvc_exp(tracking_uri: str) -> None:
@@ -120,7 +113,7 @@ def test_resume_reopens_model_child_run(
 
     children = [r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "child"]
     assert len(children) == 2
-    logreg = next(r for r in children if r.info.run_name == "my-exp-logreg")
+    logreg = next(r for r in children if r.info.run_name == "logreg")
     assert logreg.data.metrics == {"cv_f1_macro": 0.9, "test_f1_macro": 0.8}
     assert logreg.info.status == "FINISHED"
 
@@ -134,7 +127,7 @@ def test_resume_creates_child_run_when_missing(
         mlflow.log_metric("test_f1_macro", 0.8)
 
     children = [r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "child"]
-    assert [r.info.run_name for r in children] == ["my-exp-logreg"]
+    assert [r.info.run_name for r in children] == ["logreg"]
     assert "mlflow.parentRunId" in children[0].data.tags
 
 

@@ -2,8 +2,9 @@
 
 ## Run and log an experiment
 
-Train with `dvc exp run`. This logs one MLflow parent run per experiment, with one child run
-per model and, under it, one run per Optuna trial, all prefixed with the experiment name.
+Train with `dvc exp run`. This logs one MLflow parent run per experiment, named
+after the experiment, with one child run per model (named after the model) and, under it, one run
+per Optuna trial (`trial-<n>`).
 
 ```bash
 dvc exp run -n <exp_name>
@@ -31,7 +32,7 @@ Use `dvc repro` only for quick local checks, and `dvc exp run` for any run you w
 
 ## Restore an experiment
 
-Find the experiment name in MLflow (run name prefix, or the `dvc.exp_name` tag). Then:
+Find the experiment name in MLflow (parent run name, or the `dvc.exp_name` tag on the parent and model runs). Then:
 
 ```bash
 dvc exp pull origin <exp_name>
