@@ -6,7 +6,7 @@ from pathlib import Path
 import mlflow
 from mlflow.tracking import MlflowClient
 
-from src.emissions import EMISSIONS_FILE, track_emissions
+from src.emissions import EMISSIONS_FILE, emissions_record, total_emissions, track_emissions
 
 SUMMARY_KEYS = {"duration_s", "energy_consumed_kwh", "emissions_kg_co2eq"}
 
@@ -63,3 +63,36 @@ def test_metric_prefix_defaults_to_stage(tracking_uri: str, tmp_path: Path) -> N
     """Without a prefix, metric names keep using the stage label."""
     metrics = _logged_metrics(tracking_uri, "features", tmp_path)
     assert metrics == {f"features_{key}" for key in SUMMARY_KEYS}
+
+
+def test_track_emissions_does_not_upload_cumulative_csv(tracking_uri: str, tmp_path: Path) -> None:
+    """The local CSV keeps every past measurement, so it is never attached to MLflow runs."""
+    (tmp_path / EMISSIONS_FILE).write_text("old rows from other runs\n")
+    mlflow.set_experiment("test-emissions")
+    with mlflow.start_run() as run, track_emissions("unit-test", output_dir=tmp_path):
+        pass
+    assert MlflowClient(tracking_uri).list_artifacts(run.info.run_id) == []
+
+
+def test_emissions_record_is_one_csv_row(tmp_path: Path) -> None:
+    """The record of a tracker has the same columns as its row in the CodeCarbon CSV."""
+    with track_emissions("unit-test", output_dir=tmp_path) as tracker:
+        pass
+    record = emissions_record(tracker)
+    csv_row = _read_rows(tmp_path / EMISSIONS_FILE)[0]
+    assert list(record) == list(csv_row)
+    assert record["project_name"] == csv_row["project_name"]
+
+
+def test_total_emissions_sums_records() -> None:
+    """Duration, energy and emissions are summed, optionally with a name prefix."""
+    records = [
+        {"duration": 1.0, "energy_consumed": 0.25, "emissions": 0.5, "project_name": "a"},
+        {"duration": 3.0, "energy_consumed": 0.25, "emissions": 1.5, "project_name": "b"},
+    ]
+    assert total_emissions(records) == {
+        "duration_s": 4.0,
+        "energy_consumed_kwh": 0.5,
+        "emissions_kg_co2eq": 2.0,
+    }
+    assert set(total_emissions(records, prefix="train")) == {f"train_{k}" for k in SUMMARY_KEYS}
