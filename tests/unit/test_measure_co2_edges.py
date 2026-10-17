@@ -14,6 +14,7 @@ def test_default_classifiers_alternatives():
     with pytest.raises(ValueError, match="Unknown model"):
         _default_classifier("unknown_model")
 
+
 def test_hardware_collection_does_not_crash():
     # Hardware specs vary by OS, so we simply verify they run without
     # crashing to cover the nested try/except blocks.
