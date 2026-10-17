@@ -9,53 +9,49 @@ Spam detection ML system with spam detection, summarization, and automated feedb
 ## Project Organization
 
 ```
-├── LICENSE            <- Open-source license if one is chosen
-├── README.md          <- The top-level README for developers using this project.
-├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── docs               <- A default mkdocs project; see www.mkdocs.org for details
-│
-├── models             <- Trained and serialized models, model predictions, or model summaries
-│
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                         the creator's initials, and a short `-` delimited description, e.g.
-│                         `1.0-jqp-initial-data-exploration`.
-│
-├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         message_guard and configuration for tools like black
-│
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
-│
-└── src   <- Source code for use in this project.
-    │
-    ├── __init__.py             <- Makes src a Python module
-    │
-    ├── config.py               <- Store useful variables and configuration
-    │
-    ├── dataset.py              <- Data ingestion pipeline
-    │
-    ├── features.py             <- Data transformations and feature engineering
-    │
-    ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Inference wrappers for model serving          
-    │   └── train.py            <- Training loop with MLflow tracking and CodeCarbon
-    │
-    ├── api/                    <- Web API for inference and feedback collection
-    │
-    └── monitoring/             <- Data drift detection and performance monitoring
+├── .github/              <- Issue templates and CI workflow
+├── conf/                 <- Hydra configuration of the training stage
+│   ├── model/            <- Hyperparameter search space of each model
+│   └── train.yaml
+├── data/                 <- Versioned with DVC
+│   ├── dataset/          <- Training and test splits
+│   ├── processed/        <- Cleaned dataset and its validation report
+│   └── raw/              <- Dataset as downloaded from Hugging Face
+├── docs/                 <- A default mkdocs project
+│   ├── docs/             <- Dataset card, model card, and experiment tracking guide
+│   ├── edn/              <- Engineering Decision Notebook entries
+│   └── proposals/        <- Design proposals of each component
+├── gx/                   <- Great Expectations suite and checkpoint
+├── infra/mlflow/         <- Docker Compose setup of the MLflow server
+├── models/               <- Trained models, versioned with DVC
+├── notebooks/            <- Exploration notebooks.
+├── reports/
+│   ├── emissions/        <- CodeCarbon measurements
+│   ├── features/         <- Top-20 influential features of each model
+│   └── metrics/          <- Training and test metrics of each model
+├── src/
+│   ├── api/              <- Web API for inference and feedback collection (Reserved for Milestone 4)
+│   ├── data/             <- Cleaning, validation, splitting, and perturbation
+│   ├── modeling/         <- Training, evaluation, selection, explanation, and tracking
+│   ├── monitoring/       <- Data drift detection and performance monitoring (Reserved for Milestone 6)
+│   ├── config.py         <- Paths and tool settings
+│   ├── download_dataset.py
+│   └── emissions.py      <- Energy and CO2 tracking
+├── tests/
+│   ├── integration/
+│   ├── regression/
+│   └── unit/
+├── .dvcignore
+├── .gitignore
+├── AGENTS.md
+├── CONTRIBUTING.md
+├── dvc.lock
+├── dvc.yaml
+├── LICENSE
+├── params.yaml
+├── pyproject.toml
+├── README.md
+└── requirements.txt
 ```
 
 --------
@@ -100,15 +96,11 @@ and held-out test split exist, then run the checks independently for every model
 
 ```bash
 for model in logreg naive_bayes linear_svm random_forest; do
-  MODEL_NAME="$model" pytest -q tests/regression/test_model.py || exit 1
+  MODEL_NAME="$model" pytest -q tests/regression/ || exit 1
 done
 ```
 
-The tests load each trained scikit-learn model and score it against every
-example and label in the held-out test split. Accuracy, macro precision, macro
-recall, and macro F1 must each be at least `0.95`; they use the project's CSV
-data, not a Transformers pipeline. To test only one model, set `MODEL_NAME`
-explicitly, for example `MODEL_NAME=logreg pytest -v tests/regression/test_model.py`.
+`tests/regression/` now contains test_model.py (≥ 0.95 accuracy and macro precision/recall/F1) and test_robustness.py (macro F1 ≥ 0.90 and ≥ 90% unchanged predictions on the perturbed test split, and spam score not decreasing for ≥ 90% of legitimate messages after appending a spam phrase). Both run with the same MODEL_NAME loop. To test only one model, set MODEL_NAME explicitly, for example MODEL_NAME=logreg pytest -v tests/regression/test_model.py.
 
 To log training parameters, cross-validation metrics, the trained model, and
 its registration to the local MLflow server, start the existing local stack and
@@ -125,14 +117,9 @@ export MLFLOW_TRACKING_URI=http://localhost:5050
 dvc repro --force --downstream train
 ```
 
-Each trained model is registered as `spam-<model-name>` in the `spam-classifier`
-experiment. Runs also record the training dataset SHA-256, Git commit, and whether the
-working tree had uncommitted changes. If
-`MLFLOW_TRACKING_URI` is unset, training continues locally and reports that
-tracking is disabled; if it is set but the server is unreachable, training
-fails rather than silently discarding the run.
+Each model logs a child run in the spam-classifier experiment, with one nested run per Optuna trial. Runs record the hyperparameters, the cross-validation and test metrics, the energy consumption, the 20 most influential features, and the training and test splits identified by the MD5 hash of the file (the same hash DVC stores in dvc.lock). When the pipeline is run with dvc exp run, runs are grouped under one parent run per experiment and record the experiment name and its base commit, together with the commands to restore it (see docs/docs/experiment-tracking.md).
 
-Open <http://localhost:5050> to compare the runs and inspect their metrics.
+Open http://localhost:5050 to compare the runs and inspect their metrics.
 Use `dvc repro --force` to force the entire pipeline, including data processing,
 training, and evaluation. DVC runs the Great Expectations checkpoint to validate
 the cleaned dataset, but does not run pytest tests. Run the unit, integration,

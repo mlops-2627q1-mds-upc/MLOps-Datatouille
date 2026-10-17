@@ -16,6 +16,8 @@ from src.modeling.tracking import (
     build_exp_tags,
     file_md5,
     log_dataset,
+    log_emissions,
+    merge_emission_rows,
     start_model_run,
 )
 
@@ -145,3 +147,63 @@ def test_log_dataset_uses_full_file_md5_as_digest(tracking_uri: str, tmp_path: P
     assert dataset_input.dataset.digest == file_md5(path)
     assert dataset_input.dataset.name == "test"
     assert {tag.key: tag.value for tag in dataset_input.tags}["mlflow.data.context"] == "testing"
+
+
+def _emission_rows(model: str, emissions: list[float]) -> list[dict]:
+    """Build fake emission rows of one model, one per value in ``emissions``."""
+    return [
+        {
+            "model": model,
+            "step": f"trial-{i}",
+            "duration": 1.0,
+            "energy_consumed": 0.5,
+            "emissions": value,
+        }
+        for i, value in enumerate(emissions)
+    ]
+
+
+def _parent_emissions(tracking_uri: str, tmp_path: Path) -> tuple[pd.DataFrame, dict]:
+    """Return the emissions table and the metrics of the only parent run."""
+    parent = next(r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "parent")
+    path = mlflow.artifacts.download_artifacts(
+        run_id=parent.info.run_id, artifact_path="emissions/emissions.csv", dst_path=str(tmp_path)
+    )
+    return pd.read_csv(path), parent.data.metrics
+
+
+def test_merge_emission_rows_replaces_only_that_model() -> None:
+    """Retraining a model replaces its rows and keeps the other models' rows."""
+    existing = pd.DataFrame(_emission_rows("logreg", [1.0]) + _emission_rows("naive_bayes", [2.0]))
+    merged = merge_emission_rows(existing, _emission_rows("logreg", [3.0, 4.0]), "logreg")
+    assert sorted(merged["emissions"]) == [2.0, 3.0, 4.0]
+    assert merge_emission_rows(None, _emission_rows("logreg", [1.0]), "logreg").shape[0] == 1
+
+
+def test_log_emissions_builds_experiment_table_on_parent(
+    tracking_uri: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The parent holds every model's rows and their totals; reruns do not duplicate rows."""
+    monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
+    trainings = [
+        ("logreg", [1.0, 2.0]),
+        ("naive_bayes", [0.5]),
+        ("logreg", [1.5, 2.5]),  # retrained in the same experiment
+    ]
+    for model, emissions in trainings:
+        with start_model_run(model, EXPERIMENT):
+            log_emissions(model, _emission_rows(model, emissions), EXPERIMENT)
+
+    table, metrics = _parent_emissions(tracking_uri, tmp_path)
+    assert sorted(table["emissions"]) == [0.5, 1.5, 2.5]
+    assert metrics["train_emissions_kg_co2eq"] == 4.5
+    assert metrics["train_duration_s"] == 3.0
+
+
+def test_log_emissions_outside_dvc_exp_goes_to_model_run(tracking_uri: str) -> None:
+    """Without a DVC experiment there is no parent, so the model's own run gets the table."""
+    with start_model_run("logreg", EXPERIMENT) as run:
+        log_emissions("logreg", _emission_rows("logreg", [1.0]), EXPERIMENT)
+
+    artifacts = MlflowClient(tracking_uri).list_artifacts(run.info.run_id, "emissions")
+    assert [item.path for item in artifacts] == ["emissions/emissions.csv"]
