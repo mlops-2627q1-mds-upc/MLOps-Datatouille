@@ -74,6 +74,7 @@ def test_configured_expectations_accept_valid_processed_dataframe():
         ("n_urls", -1, "expect_column_values_to_be_between"),
         ("text", "Mail john@spam.com now", "expect_column_values_to_not_match_regex"),
         ("text", "Call +34 612 345 678 now", "expect_column_values_to_not_match_regex"),
+        ("clean_text", "team meet", "expect_column_values_to_be_unique"),
     ],
 )
 def test_configured_expectations_reject_invalid_processed_data(
@@ -81,7 +82,7 @@ def test_configured_expectations_reject_invalid_processed_data(
     invalid_value: object,
     expected_expectation: str,
 ):
-    """Test of rejecting invalid labels, null text, negative counts, and contact details."""
+    """Test of rejecting invalid labels, null text, negative counts, contacts, and duplicates."""
     dataframe = _valid_processed_dataframe()
     dataframe.loc[0, column] = invalid_value
 
