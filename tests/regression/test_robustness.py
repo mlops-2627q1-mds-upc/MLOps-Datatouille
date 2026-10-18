@@ -18,8 +18,8 @@ from sklearn.metrics import f1_score
 from sklearn.pipeline import Pipeline
 
 from src.config import DATA_DIR, MODELS_DIR
-from src.data.perturb import append_text, perturb_dataframe
 from src.modeling.train import TEXT_COL, get_count_columns
+from tests.perturb import append_text, perturb_dataframe
 
 MODEL_NAMES = {"logreg", "naive_bayes", "linear_svm", "random_forest"}
 MODEL_NAME = os.environ.get("MODEL_NAME", "logreg")

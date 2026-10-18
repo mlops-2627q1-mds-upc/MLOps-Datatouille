@@ -45,7 +45,7 @@ extend-exclude = [
 select = ["E", "W", "F", "I", "C90", "D213"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["src"]
+known-first-party = ["src", "tests"]
 force-sort-within-sections = true
 
 [tool.coverage.report]

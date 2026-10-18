@@ -31,7 +31,7 @@ Spam detection ML system with spam detection, summarization, and automated feedb
 │   └── metrics/          <- Training and test metrics of each model
 ├── src/
 │   ├── api/              <- Web API for inference and feedback collection (Reserved for Milestone 4)
-│   ├── data/             <- Download, cleaning, validation, splitting, and perturbation
+│   ├── data/             <- Download, cleaning, validation, and splitting
 │   ├── modeling/         <- Training, evaluation, selection, explanation, and tracking
 │   ├── monitoring/       <- Data drift detection and performance monitoring (Reserved for Milestone 6)
 │   ├── config.py         <- Paths and tool settings

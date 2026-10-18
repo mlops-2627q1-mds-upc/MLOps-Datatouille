@@ -1,5 +1,5 @@
 """
-Unit tests for the controlled changes of messages in src/data/perturb.py.
+Unit tests for the controlled changes of messages in tests/perturb.py.
 """
 
 import random
@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from src.data import preprocess as pp
-from src.data.perturb import (
+from tests.perturb import (
     append_text,
     obfuscate_urls,
     perturb_dataframe,
