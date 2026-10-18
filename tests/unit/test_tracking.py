@@ -13,6 +13,7 @@ import pytest
 from src.modeling.tracking import (
     EXP_REF_TAG,
     NOTE_TAG,
+    RUN_ROLE_MODEL,
     RUN_ROLE_TAG,
     build_exp_ref,
     build_exp_tags,
@@ -111,7 +112,34 @@ def test_standalone_run_outside_dvc_exp(tracking_uri: str) -> None:
     runs = _runs(tracking_uri)
     assert len(runs) == 1
     assert runs[0].info.run_name == "logreg"
+    assert runs[0].data.tags[RUN_ROLE_TAG] == RUN_ROLE_MODEL
     assert "mlflow.parentRunId" not in runs[0].data.tags
+
+
+def test_resume_reopens_standalone_run(tracking_uri: str) -> None:
+    """
+    Outside dvc exp run, evaluation merges its metrics into the model's training run.
+    """
+    with start_model_run("logreg", EXPERIMENT):
+        mlflow.log_metric("cv_f1_macro", 0.9)
+    with start_model_run("logreg", EXPERIMENT, resume=True):
+        mlflow.log_metric("test_f1_macro", 0.8)
+
+    runs = _runs(tracking_uri)
+    assert len(runs) == 1
+    assert runs[0].data.metrics == {"cv_f1_macro": 0.9, "test_f1_macro": 0.8}
+
+
+def test_resume_creates_standalone_run_when_missing(tracking_uri: str) -> None:
+    """
+    If training was skipped (cached by DVC), evaluation still logs a standalone run.
+    """
+    with start_model_run("logreg", EXPERIMENT, resume=True):
+        mlflow.log_metric("test_f1_macro", 0.8)
+
+    runs = _runs(tracking_uri)
+    assert [r.info.run_name for r in runs] == ["logreg"]
+    assert runs[0].data.tags[RUN_ROLE_TAG] == RUN_ROLE_MODEL
 
 
 def test_resume_reopens_model_child_run(

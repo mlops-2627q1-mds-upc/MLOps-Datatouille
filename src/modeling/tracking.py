@@ -18,7 +18,9 @@ functions. Under ``dvc exp run``, runs are organized in three levels:
 
 Each ``train@<model>`` stage is a separate process, so the parent run is looked up by its tags
 and reused instead of recreated. Outside ``dvc exp run`` (e.g. ``dvc repro``) there is no
-parent: each model gets a standalone run, which cannot be restored from MLflow.
+parent: each model gets a standalone run, tagged with the model role so the ``evaluate`` stage
+reopens it and merges the training and test metrics into one run. A standalone run cannot be
+restored from MLflow.
 """
 
 from collections.abc import Iterator
@@ -42,6 +44,7 @@ EXP_NAME_TAG = "dvc.exp_name"
 BASELINE_REV_TAG = "dvc.baseline_rev"
 EXP_REF_TAG = "dvc.exp_ref"
 RUN_ROLE_TAG = "run_role"
+RUN_ROLE_MODEL = "model"
 MODEL_TAG = "model"
 NOTE_TAG = "mlflow.note.content"
 EXPS_NAMESPACE = "refs/exps"
@@ -244,13 +247,16 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
 
     Under ``dvc exp run`` the run is a child of the experiment's parent run. With ``resume``,
     the latest child run of this model in the experiment is reopened (e.g. to add test metrics
-    to the training run), and a new one is created only if none exists. Outside ``dvc exp run``
-    (e.g. ``dvc repro``) a new standalone run named after the model is started.
+    to the training run), and a new one is created only if none exists.
+
+    Outside ``dvc exp run`` (e.g. ``dvc repro``) the model gets a standalone run named after it
+    and tagged with the model role. With ``resume``, this standalone run is reopened if it
+    exists, so ``dvc repro`` also merges the training and evaluation stages into one run.
 
     Args:
         model_name: Name of the model.
         experiment_name: MLflow experiment to log into (created if missing).
-        resume: If True, reopen the model's existing child run instead of creating one.
+        resume: If True, reopen the model's existing run instead of creating one.
 
     Yields:
         The active MLflow run for the model.
@@ -258,8 +264,15 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
     exp_name, baseline_rev = get_dvc_exp_context()
     experiment = mlflow.set_experiment(experiment_name)
     if not exp_name:
-        with mlflow.start_run(run_name=model_name) as run:
-            yield run
+        model_tags = {RUN_ROLE_TAG: RUN_ROLE_MODEL, MODEL_TAG: model_name}
+        client = MlflowClient()
+        run_id = find_latest_run(client, experiment.experiment_id, model_tags) if resume else None
+        if run_id:
+            with mlflow.start_run(run_id=run_id) as run:
+                yield run
+        else:
+            with mlflow.start_run(run_name=model_name, tags=model_tags) as run:
+                yield run
         return
 
     client = MlflowClient()
