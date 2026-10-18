@@ -1,12 +1,23 @@
-"""MLflow tracking for the training stage.
+"""MLflow tracking for the training and evaluation stages.
 
-One DVC experiment (``dvc exp run``) maps to one MLflow parent run, and each model trained by
-the ``train`` foreach stage logs a nested child run under it. Every ``train@<model>`` stage is
-a separate process, so the parent run is looked up by tags and reused instead of recreated.
-Parent and child runs record the DVC experiment name, git ref and restore commands, so a
-run can be reproduced from the MLflow UI with ``dvc exp pull`` + ``dvc exp apply``.
-The parent run also holds the emissions of the whole experiment: one CSV with every
-measurement of every model, and its totals.
+This module groups every interaction with MLflow, so the pipeline stages only call a few
+functions. Under ``dvc exp run``, runs are organized in three levels:
+
+- Parent run: one per DVC experiment, named after it. It stores the experiment name, its base
+  commit, its Git ref, and the commands to restore it (``dvc exp pull`` + ``dvc exp apply``).
+  It also holds the emissions of the whole experiment: one CSV with every measurement of every
+  model, labelled by model and training step, and its totals.
+- Model run: one child run per model of the ``train`` foreach stage. It records the
+  hyperparameters, the cross-validation metrics of the best trial, the training split
+  (identified by the MD5 of the file, the same hash DVC stores in ``dvc.lock``), and the
+  emission totals of the model. The ``evaluate`` stage reopens it to add the test metrics, the
+  test split, and the most influential features.
+- Trial run: one run per Optuna trial, nested in the model run, with its sampled
+  hyperparameters, cross-validation metrics, and emissions.
+
+Each ``train@<model>`` stage is a separate process, so the parent run is looked up by its tags
+and reused instead of recreated. Outside ``dvc exp run`` (e.g. ``dvc repro``) there is no
+parent: each model gets a standalone run, which cannot be restored from MLflow.
 """
 
 from collections.abc import Iterator

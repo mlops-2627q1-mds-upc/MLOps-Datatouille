@@ -1,9 +1,19 @@
 """
-Training stage of the pipeline: hyperparameter tuning and training with Hydra, Optuna, and MLflow.
+Training stage of the pipeline: hyperparameter tuning and final training of one model.
 
-Each run tunes one model with a seeded Optuna study, refits the best hyperparameters on the
-whole train set, and writes the model plus the CV metrics of the best trial. MLflow runs are
-nested as DVC experiment > model > trial (see src.modeling.tracking).
+DVC runs this stage once per model listed in ``params.yaml`` (``train`` foreach stage). Each run:
+
+1. Reads its configuration with Hydra (``conf/train.yaml`` and ``conf/model/<name>.yaml``,
+   which defines the search space). DVC passes its tracked parameters as Hydra overrides.
+2. Runs a seeded Optuna study inside this process (``run_study``). Each trial evaluates the
+   full pipeline with stratified cross-validation. Hydra's Optuna sweeper is not used, since
+   it would launch one process per trial and break the single-command contract of a DVC
+   stage (see EDN-004).
+3. Refits the best hyperparameters on the whole training split and saves the model and the
+   cross-validation metrics of the best trial.
+
+Every trial and the final fit are measured with CodeCarbon. MLflow runs are nested as
+DVC experiment > model > trial (see ``src.modeling.tracking``).
 
 Usage (orchestrated by DVC):
     python -m src.modeling.train model=logreg metrics_out=reports/metrics/train/logreg.json
