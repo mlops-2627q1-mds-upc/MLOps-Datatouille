@@ -1,4 +1,5 @@
-"""Controlled changes of messages, used to test the behaviour of the trained models.
+"""
+Controlled changes of messages, used to test the behaviour of the trained models.
 
 Two kinds of changes are provided:
     - Perturbations that should not change the label: random case changes, typos made by
@@ -27,7 +28,8 @@ _URL_REGEX = re.compile(pp.URL_PATTERN)
 
 
 def obfuscate_urls(text: str) -> str:
-    """Obfuscate every URL so that it is no longer recognized as a link.
+    """
+    Obfuscate every URL so that it is no longer recognized as a link.
 
     Args:
         text: Original text.
@@ -43,7 +45,8 @@ def obfuscate_urls(text: str) -> str:
 
 
 def swap_adjacent_letters(word: str, rng: random.Random) -> str:
-    """Simulate a typo by swapping two adjacent letters of a word.
+    """
+    Simulate a typo by swapping two adjacent letters of a word.
 
     Args:
         word: Word to modify. Punctuation attached to it is kept in place.
@@ -66,7 +69,8 @@ def perturb_text(
     case_change_rate: float = CASE_CHANGE_RATE,
     typo_rate: float = TYPO_RATE,
 ) -> str:
-    """Apply case changes, typos, and URL obfuscation to a message.
+    """
+    Apply case changes, typos, and URL obfuscation to a message.
 
     Args:
         text: Original message.
@@ -95,7 +99,8 @@ def perturb_text(
 def rebuild_features(
     df: pd.DataFrame, text_col: str, emojis_as_text: bool = False
 ) -> pd.DataFrame:
-    """Recompute the count features and the normalized text from the original text.
+    """
+    Recompute the count features and the normalized text from the original text.
 
     Args:
         df: Dataset whose original text has been modified.
@@ -117,7 +122,8 @@ def perturb_dataframe(
     seed: int = DEFAULT_SEED,
     emojis_as_text: bool = False,
 ) -> pd.DataFrame:
-    """Create a perturbed copy of a cleaned dataset, keeping its labels and number of rows.
+    """
+    Create a perturbed copy of a cleaned dataset, keeping its labels and number of rows.
 
     Args:
         df: Cleaned dataset with the original text, the count features, and ``clean_text``.
@@ -140,7 +146,8 @@ def append_text(
     text_col: str = "text",
     emojis_as_text: bool = False,
 ) -> pd.DataFrame:
-    """Append the same text to every message of a cleaned dataset.
+    """
+    Append the same text to every message of a cleaned dataset.
 
     Args:
         df: Cleaned dataset with the original text, the count features, and ``clean_text``.

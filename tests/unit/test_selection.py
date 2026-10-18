@@ -1,4 +1,6 @@
-"""Unit tests for the model selection stage."""
+"""
+Unit tests for the model selection stage.
+"""
 
 import json
 from pathlib import Path
@@ -9,7 +11,9 @@ from src.modeling.selection import build_selection, load_cv_metrics, select_best
 
 
 def test_load_cv_metrics_reads_models_in_order(tmp_path: Path) -> None:
-    """Metrics are loaded per model, keeping the given model order."""
+    """
+    Metrics are loaded per model, keeping the given model order.
+    """
     for model, value in (("logreg", 0.9), ("naive_bayes", 0.8)):
         (tmp_path / f"{model}.json").write_text(json.dumps({"cv_f1_macro": value}))
     metrics = load_cv_metrics(tmp_path, ["naive_bayes", "logreg"])
@@ -18,7 +22,9 @@ def test_load_cv_metrics_reads_models_in_order(tmp_path: Path) -> None:
 
 
 def test_load_cv_metrics_missing_file_raises(tmp_path: Path) -> None:
-    """A model listed in params but never trained is an error, not silently skipped."""
+    """
+    A model listed in params but never trained is an error, not silently skipped.
+    """
     with pytest.raises(FileNotFoundError):
         load_cv_metrics(tmp_path, ["logreg"])
 

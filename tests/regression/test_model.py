@@ -35,13 +35,17 @@ if not (MODEL_PATH.exists() and TEST_PATH.exists()):
 
 @pytest.fixture(scope="module")
 def model() -> Pipeline:
-    """Load the selected model artifact."""
+    """
+    Load the selected model artifact.
+    """
     return joblib.load(MODEL_PATH)
 
 
 @pytest.fixture(scope="module")
 def test_data() -> tuple[pd.DataFrame, pd.Series]:
-    """Load every example from the held-out test split."""
+    """
+    Load every example from the held-out test split.
+    """
     features, labels, _ = load_xy(TEST_PATH, LABEL_COLUMN)
     return features, labels
 
@@ -51,7 +55,9 @@ def model_metrics(
     model: Pipeline,
     test_data: tuple[pd.DataFrame, pd.Series],
 ) -> dict[str, float]:
-    """Calculate classification metrics against all held-out labels."""
+    """
+    Calculate classification metrics against all held-out labels.
+    """
     features, labels = test_data
     predictions = model.predict(features)
     return {

@@ -1,4 +1,5 @@
-"""Great Expectations configuration: what the cleaned dataset must look like.
+"""
+Great Expectations configuration: what the cleaned dataset must look like.
 
 Creates (or updates) the GX file context in gx/ with:
     - a pandas data source pointing to data/processed/,
@@ -60,8 +61,13 @@ CHECKPOINT_NAME = "processed_spam_dataset_checkpoint"
 VALIDATION_REPORT = ROOT_DIR / "data" / "processed" / "gx_validation.json"
 
 
-def build_expectations():
-    """Expectations that the cleaned dataset must meet before splitting."""
+def build_expectations() -> list[gxe.Expectation]:
+    """
+    Build the expectations that the cleaned dataset must meet before splitting.
+
+    Returns:
+        The list of Great Expectations expectations.
+    """
     expectations = [
         gxe.ExpectTableColumnsToMatchOrderedList(column_list=EXPECTED_COLUMNS),
         gxe.ExpectTableRowCountToBeBetween(min_value=1),
@@ -91,8 +97,13 @@ def build_expectations():
     return expectations
 
 
-def configure_context():
-    """Create or update the GX context, data source, suite, validation and checkpoint."""
+def configure_context() -> gx.Checkpoint:
+    """
+    Create or update the GX context, data source, suite, validation and checkpoint.
+
+    Returns:
+        The configured checkpoint.
+    """
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
     data_source = context.data_sources.add_or_update_pandas_filesystem(
@@ -119,7 +130,8 @@ def configure_context():
     return checkpoint
 
 
-def main():
+def main() -> None:
+    """Run the checkpoint and write the validation report, failing on unmet expectations."""
     checkpoint = configure_context()
     logger.info("Validating %s", PROCESSED_DIR / PROCESSED_FILE)
     result = checkpoint.run()

@@ -1,4 +1,6 @@
-"""Stratified train/test split of the cleaned dataset."""
+"""
+Stratified train/test split of the cleaned dataset.
+"""
 
 import pandas as pd
 from sklearn.model_selection import train_test_split

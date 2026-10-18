@@ -1,4 +1,5 @@
-"""Integration tests for the project's Great Expectations configuration.
+"""
+Integration tests for the project's Great Expectations configuration.
 
 These tests verify that the configured expectations accept valid data and reject
 invalid data. They are separate from the Great Expectations validation itself,
@@ -19,7 +20,9 @@ PROCESSED_DATA_PATH = ROOT_DIR / "data" / "processed" / "clean.csv"
 
 
 def _validate_dataframe(dataframe: pd.DataFrame):
-    """Run the project's actual expectations against an in-memory DataFrame."""
+    """
+    Run the project's actual expectations against an in-memory DataFrame.
+    """
     context = gx.get_context(mode="ephemeral")
     data_source = context.data_sources.add_pandas(name="preprocessing_test_source")
     asset = data_source.add_dataframe_asset(name="preprocessing_test_asset")
@@ -35,7 +38,9 @@ def _validate_dataframe(dataframe: pd.DataFrame):
 
 
 def _valid_processed_dataframe() -> pd.DataFrame:
-    """Create a small DataFrame that satisfies the configured dataset expectations."""
+    """
+    Create a small DataFrame that satisfies the configured dataset expectations.
+    """
     return pd.DataFrame(
         [
             ["Win prize", "spam", 9, 2, 1, 2, 0, 0, 1, "win prize"],
@@ -82,7 +87,9 @@ def test_configured_expectations_reject_invalid_processed_data(
     invalid_value: object,
     expected_expectation: str,
 ):
-    """Test of rejecting invalid labels, null text, negative counts, contacts, and duplicates."""
+    """
+    Test of rejecting invalid labels, null text, negative counts, contacts, and duplicates.
+    """
     dataframe = _valid_processed_dataframe()
     dataframe.loc[0, column] = invalid_value
 
@@ -109,7 +116,9 @@ def test_configured_expectations_reject_incorrect_column_types(
     column: str,
     invalid_values: list[object],
 ):
-    """Test of rejecting non-string labels/text and non-integer count features."""
+    """
+    Test of rejecting non-string labels/text and non-integer count features.
+    """
     dataframe = _valid_processed_dataframe()
     dataframe[column] = invalid_values
 

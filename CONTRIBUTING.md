@@ -162,6 +162,9 @@ Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 * Use Google Style docstrings.
 * Include: short summary, `Args:`, `Returns:`, `Raises:` (if applicable).
 * Keep summary in imperative mood and in one line.
+* Start the content on the line after the opening `"""` (a new line right after the quotes). Ruff `D213` enforces this for every multi-line docstring.
+* Tests (`tests/`): document the behaviour with a short summary only. Do not add `Args:` or
+  `Returns:` for pytest fixtures or `@pytest.mark.parametrize` arguments.
 
 Example:
 ```python

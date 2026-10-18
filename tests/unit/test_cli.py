@@ -1,3 +1,8 @@
+"""
+Unit tests for the command-line entrypoints.
+"""
+
+import json
 from unittest.mock import MagicMock, patch
 
 from src.data.cleaning import main as cleaning_main
@@ -92,9 +97,15 @@ def test_evaluation_main(
         "out.json",
     ],
 )
-def test_selection_main(mock_build, mock_select, mock_load, mock_dvc):
+def test_selection_main(mock_build, mock_select, mock_load, mock_dvc, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     mock_dvc.return_value = {"train": {"models": ["m1"]}}
+    metrics = {"m1": {"acc": 0.9}}
+    mock_load.return_value = metrics
     mock_select.return_value = ("m1", 0.9)
     mock_build.return_value = {"model": "m1"}
     selection_main()
+    mock_load.assert_called_once()
+    mock_select.assert_called_once_with(metrics, "acc")
     mock_build.assert_called_once()
+    assert json.loads((tmp_path / "out.json").read_text()) == {"model": "m1"}

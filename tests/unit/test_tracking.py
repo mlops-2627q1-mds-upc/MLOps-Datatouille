@@ -1,4 +1,6 @@
-"""Unit tests for the MLflow tracking helpers of the training stage."""
+"""
+Unit tests for the MLflow tracking helpers of the training stage.
+"""
 
 import hashlib
 from pathlib import Path
@@ -25,7 +27,9 @@ EXPERIMENT = "test-experiment"
 
 
 def _runs(uri: str) -> list:
-    """Return all runs of the test experiment."""
+    """
+    Return all runs of the test experiment.
+    """
     client = MlflowClient(uri)
     experiment = client.get_experiment_by_name(EXPERIMENT)
     return client.search_runs([experiment.experiment_id])
@@ -52,7 +56,9 @@ def test_build_exp_tags_without_baseline_rev() -> None:
 
 
 def test_file_md5_matches_hashlib(tmp_path: Path) -> None:
-    """The dataset hash matches hashlib's MD5 of the file content."""
+    """
+    The dataset hash matches hashlib's MD5 of the file content.
+    """
     path = tmp_path / "data.csv"
     path.write_bytes(b"text,label\nhi,ham\n")
     assert file_md5(path) == hashlib.md5(b"text,label\nhi,ham\n").hexdigest()
@@ -61,7 +67,9 @@ def test_file_md5_matches_hashlib(tmp_path: Path) -> None:
 def test_runs_share_one_parent_under_dvc_exp(
     tracking_uri: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """All models of one DVC experiment log child runs under a single parent."""
+    """
+    All models of one DVC experiment log child runs under a single parent.
+    """
     monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
     monkeypatch.setenv("DVC_EXP_BASELINE_REV", "abc123")
 
@@ -81,7 +89,9 @@ def test_runs_share_one_parent_under_dvc_exp(
 
 
 def test_new_dvc_exp_gets_new_parent(tracking_uri: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Each DVC experiment gets its own parent run."""
+    """
+    Each DVC experiment gets its own parent run.
+    """
     for exp_name in ("exp-a", "exp-b"):
         monkeypatch.setenv("DVC_EXP_NAME", exp_name)
         with start_model_run("logreg", EXPERIMENT):
@@ -92,7 +102,9 @@ def test_new_dvc_exp_gets_new_parent(tracking_uri: str, monkeypatch: pytest.Monk
 
 
 def test_standalone_run_outside_dvc_exp(tracking_uri: str) -> None:
-    """Outside dvc exp run, a standalone run named after the model is logged."""
+    """
+    Outside dvc exp run, a standalone run named after the model is logged.
+    """
     with start_model_run("logreg", EXPERIMENT):
         pass
 
@@ -105,7 +117,9 @@ def test_standalone_run_outside_dvc_exp(tracking_uri: str) -> None:
 def test_resume_reopens_model_child_run(
     tracking_uri: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Evaluation adds its metrics to the model's training run, not a new run."""
+    """
+    Evaluation adds its metrics to the model's training run, not a new run.
+    """
     monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
     for model in ("logreg", "naive_bayes"):
         with start_model_run(model, EXPERIMENT):
@@ -123,7 +137,9 @@ def test_resume_reopens_model_child_run(
 def test_resume_creates_child_run_when_missing(
     tracking_uri: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """If training was skipped (cached by DVC), evaluation still logs a child run."""
+    """
+    If training was skipped (cached by DVC), evaluation still logs a child run.
+    """
     monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
     with start_model_run("logreg", EXPERIMENT, resume=True):
         mlflow.log_metric("test_f1_macro", 0.8)
@@ -134,7 +150,9 @@ def test_resume_creates_child_run_when_missing(
 
 
 def test_log_dataset_uses_full_file_md5_as_digest(tracking_uri: str, tmp_path: Path) -> None:
-    """The dataset is logged with its context and the whole-file MD5 as digest."""
+    """
+    The dataset is logged with its context and the whole-file MD5 as digest.
+    """
     path = tmp_path / "test.csv"
     df = pd.DataFrame({"clean_text": ["hi", "win now"], "label": ["ham", "spam"]})
     df.to_csv(path, index=False)
@@ -150,7 +168,9 @@ def test_log_dataset_uses_full_file_md5_as_digest(tracking_uri: str, tmp_path: P
 
 
 def _emission_rows(model: str, emissions: list[float]) -> list[dict]:
-    """Build fake emission rows of one model, one per value in ``emissions``."""
+    """
+    Build fake emission rows of one model, one per value in ``emissions``.
+    """
     return [
         {
             "model": model,
@@ -164,7 +184,9 @@ def _emission_rows(model: str, emissions: list[float]) -> list[dict]:
 
 
 def _parent_emissions(tracking_uri: str, tmp_path: Path) -> tuple[pd.DataFrame, dict]:
-    """Return the emissions table and the metrics of the only parent run."""
+    """
+    Return the emissions table and the metrics of the only parent run.
+    """
     parent = next(r for r in _runs(tracking_uri) if r.data.tags[RUN_ROLE_TAG] == "parent")
     path = mlflow.artifacts.download_artifacts(
         run_id=parent.info.run_id, artifact_path="emissions/emissions.csv", dst_path=str(tmp_path)
@@ -183,7 +205,9 @@ def test_merge_emission_rows_replaces_only_that_model() -> None:
 def test_log_emissions_builds_experiment_table_on_parent(
     tracking_uri: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The parent holds every model's rows and their totals; reruns do not duplicate rows."""
+    """
+    The parent holds every model's rows and their totals; reruns do not duplicate rows.
+    """
     monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
     trainings = [
         ("logreg", [1.0, 2.0]),
@@ -201,7 +225,9 @@ def test_log_emissions_builds_experiment_table_on_parent(
 
 
 def test_log_emissions_outside_dvc_exp_goes_to_model_run(tracking_uri: str) -> None:
-    """Without a DVC experiment there is no parent, so the model's own run gets the table."""
+    """
+    Without a DVC experiment there is no parent, so the model's own run gets the table.
+    """
     with start_model_run("logreg", EXPERIMENT) as run:
         log_emissions("logreg", _emission_rows("logreg", [1.0]), EXPERIMENT)
 

@@ -1,4 +1,6 @@
-"""Fixtures shared by all the test modules."""
+"""
+Fixtures shared by all the test modules.
+"""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -31,7 +33,8 @@ def sample_df():
 
 @pytest.fixture
 def tracking_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
-    """Point MLflow to a throwaway local store and clear DVC experiment env vars.
+    """
+    Point MLflow to a throwaway local store and clear DVC experiment env vars.
 
     Also runs the test inside ``tmp_path``, since MLflow writes artifacts of a local store
     to ``./mlruns``.

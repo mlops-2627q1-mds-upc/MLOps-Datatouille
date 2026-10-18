@@ -45,14 +45,17 @@ if not (MODEL_PATH.exists() and TEST_PATH.exists()):
 
 
 def model_inputs(df: pd.DataFrame) -> pd.DataFrame:
-    """Select the columns used by the model, as the training stage does."""
+    """
+    Select the columns used by the model, as the training stage does.
+    """
     df = df.copy()
     df[TEXT_COL] = df[TEXT_COL].fillna("").astype(str)
     return df[[TEXT_COL] + get_count_columns(df)]
 
 
 def spam_score(model: Pipeline, features: pd.DataFrame) -> np.ndarray:
-    """Return a score that increases with the confidence of the model in the spam class.
+    """
+    Return a score that increases with the confidence of the model in the spam class.
 
     Probabilistic models return the probability of spam. The linear SVM has no probabilities,
     so its decision function is used, oriented so that higher values mean spam.
@@ -66,24 +69,32 @@ def spam_score(model: Pipeline, features: pd.DataFrame) -> np.ndarray:
 
 @pytest.fixture(scope="module")
 def model() -> Pipeline:
-    """Load the trained model under test."""
+    """
+    Load the trained model under test.
+    """
     return joblib.load(MODEL_PATH)
 
 
 @pytest.fixture(scope="module")
 def test_df() -> pd.DataFrame:
-    """Load the held-out test split."""
+    """
+    Load the held-out test split.
+    """
     return pd.read_csv(TEST_PATH)
 
 
 @pytest.fixture(scope="module")
 def perturbed_df(test_df: pd.DataFrame) -> pd.DataFrame:
-    """Perturbed copy of the test split, reproducible through a fixed seed."""
+    """
+    Perturbed copy of the test split, reproducible through a fixed seed.
+    """
     return perturb_dataframe(test_df, text_col="text", seed=SEED)
 
 
 def test_macro_f1_on_perturbed_split(model: Pipeline, perturbed_df: pd.DataFrame) -> None:
-    """Invariance (REQ-NF-11): the macro F1 score stays high on perturbed messages."""
+    """
+    Invariance (REQ-NF-11): the macro F1 score stays high on perturbed messages.
+    """
     predictions = model.predict(model_inputs(perturbed_df))
     score = f1_score(perturbed_df[LABEL_COLUMN], predictions, average="macro")
     assert score >= MIN_PERTURBED_F1_MACRO, (
@@ -95,7 +106,9 @@ def test_macro_f1_on_perturbed_split(model: Pipeline, perturbed_df: pd.DataFrame
 def test_predictions_unchanged_by_perturbation(
     model: Pipeline, test_df: pd.DataFrame, perturbed_df: pd.DataFrame
 ) -> None:
-    """Invariance: most individual predictions do not change after the perturbation."""
+    """
+    Invariance: most individual predictions do not change after the perturbation.
+    """
     original = model.predict(model_inputs(test_df))
     perturbed = model.predict(model_inputs(perturbed_df))
     unchanged = float(np.mean(original == perturbed))
@@ -106,7 +119,9 @@ def test_predictions_unchanged_by_perturbation(
 
 
 def test_spam_phrase_does_not_lower_spam_score(model: Pipeline, test_df: pd.DataFrame) -> None:
-    """Directional: appending a spam phrase to legitimate messages does not lower their score."""
+    """
+    Directional: appending a spam phrase to legitimate messages does not lower their score.
+    """
     legitimate = test_df[test_df[LABEL_COLUMN] == NOT_SPAM_LABEL]
     extended = append_text(legitimate, SPAM_PHRASE, text_col="text")
     before = spam_score(model, model_inputs(legitimate))

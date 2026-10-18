@@ -1,4 +1,5 @@
-"""MLflow tracking for the training and evaluation stages.
+"""
+MLflow tracking for the training and evaluation stages.
 
 This module groups every interaction with MLflow, so the pipeline stages only call a few
 functions. Under ``dvc exp run``, runs are organized in three levels:
@@ -52,7 +53,8 @@ EMISSIONS_METRIC_PREFIX = "train"
 
 
 def get_dvc_exp_context() -> tuple[str | None, str | None]:
-    """Read the DVC experiment name and baseline commit set by ``dvc exp run``.
+    """
+    Read the DVC experiment name and baseline commit set by ``dvc exp run``.
 
     Returns:
         Tuple ``(exp_name, baseline_rev)``. Each is None outside ``dvc exp run``.
@@ -61,7 +63,8 @@ def get_dvc_exp_context() -> tuple[str | None, str | None]:
 
 
 def build_exp_ref(exp_name: str, baseline_rev: str) -> str:
-    """Build the git ref under which DVC stores an experiment.
+    """
+    Build the git ref under which DVC stores an experiment.
 
     Args:
         exp_name: DVC experiment name.
@@ -74,7 +77,8 @@ def build_exp_ref(exp_name: str, baseline_rev: str) -> str:
 
 
 def build_restore_note(exp_name: str, baseline_rev: str | None) -> str:
-    """Build the MLflow run description explaining how to restore the DVC experiment.
+    """
+    Build the MLflow run description explaining how to restore the DVC experiment.
 
     Args:
         exp_name: DVC experiment name.
@@ -97,7 +101,8 @@ def build_restore_note(exp_name: str, baseline_rev: str | None) -> str:
 
 
 def build_exp_tags(exp_name: str, baseline_rev: str | None, role: str) -> dict[str, str]:
-    """Build the MLflow tags linking a run to its DVC experiment.
+    """
+    Build the MLflow tags linking a run to its DVC experiment.
 
     Args:
         exp_name: DVC experiment name.
@@ -115,7 +120,8 @@ def build_exp_tags(exp_name: str, baseline_rev: str | None, role: str) -> dict[s
 
 
 def file_md5(path: Path) -> str:
-    """Compute the MD5 hash of a file, used to record the dataset version.
+    """
+    Compute the MD5 hash of a file, used to record the dataset version.
 
     Args:
         path: File to hash.
@@ -134,7 +140,8 @@ def file_md5(path: Path) -> str:
 
 
 def log_dataset(x: pd.DataFrame, y: pd.Series, path: Path, context: str) -> None:
-    """Log a dataset as an input of the active MLflow run.
+    """
+    Log a dataset as an input of the active MLflow run.
 
     The digest is the MD5 of the whole file (MLflow's default only hashes the first rows), so it
     matches the hash DVC records in ``dvc.lock``.
@@ -159,7 +166,8 @@ def log_dataset(x: pd.DataFrame, y: pd.Series, path: Path, context: str) -> None
 
 
 def find_latest_run(client: MlflowClient, experiment_id: str, tags: dict[str, str]) -> str | None:
-    """Return the most recent run whose tags match all of ``tags``.
+    """
+    Return the most recent run whose tags match all of ``tags``.
 
     Args:
         client: MLflow client.
@@ -180,7 +188,8 @@ def find_latest_run(client: MlflowClient, experiment_id: str, tags: dict[str, st
 
 
 def build_lookup_tags(exp_name: str, baseline_rev: str | None, role: str) -> dict[str, str]:
-    """Build the tags identifying a run of a DVC experiment, used to look it up.
+    """
+    Build the tags identifying a run of a DVC experiment, used to look it up.
 
     Args:
         exp_name: DVC experiment name.
@@ -202,7 +211,8 @@ def find_or_create_parent_run(
     exp_name: str,
     baseline_rev: str | None,
 ) -> str:
-    """Return the parent run of a DVC experiment, creating it on first use.
+    """
+    Return the parent run of a DVC experiment, creating it on first use.
 
     Args:
         client: MLflow client.
@@ -229,7 +239,8 @@ def find_or_create_parent_run(
 
 @contextmanager
 def start_model_run(model_name: str, experiment_name: str, resume: bool = False) -> Iterator[Run]:
-    """Start the MLflow run for one model.
+    """
+    Start the MLflow run for one model.
 
     Under ``dvc exp run`` the run is a child of the experiment's parent run. With ``resume``,
     the latest child run of this model in the experiment is reopened (e.g. to add test metrics
@@ -267,7 +278,8 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
 
 
 def start_trial_run(model_name: str, trial_number: int) -> Run:
-    """Start the MLflow run of one hyperparameter-search trial, nested in the active run.
+    """
+    Start the MLflow run of one hyperparameter-search trial, nested in the active run.
 
     Must be called while the model's run (from ``start_model_run``) is active. The run gets
     the ``trial`` role, so ``start_model_run(resume=True)`` never mistakes it for the model run.
@@ -289,7 +301,8 @@ def start_trial_run(model_name: str, trial_number: int) -> Run:
 def merge_emission_rows(
     existing: pd.DataFrame | None, rows: list[dict[str, Any]], model_name: str
 ) -> pd.DataFrame:
-    """Replace one model's rows in an experiment's emissions table.
+    """
+    Replace one model's rows in an experiment's emissions table.
 
     Rows of ``model_name`` already in the table are dropped first, so retraining a model in
     the same experiment replaces its measurements instead of duplicating them.
@@ -310,7 +323,8 @@ def merge_emission_rows(
 
 
 def _download_emissions(client: MlflowClient, run_id: str, tmp_dir: Path) -> pd.DataFrame | None:
-    """Download the emissions table of a run, if it has one.
+    """
+    Download the emissions table of a run, if it has one.
 
     Args:
         client: MLflow client.
@@ -334,7 +348,8 @@ def _download_emissions(client: MlflowClient, run_id: str, tmp_dir: Path) -> pd.
 def _upload_emissions(
     client: MlflowClient, run_id: str, table: pd.DataFrame, tmp_dir: Path
 ) -> None:
-    """Upload an emissions table as ``emissions/emissions.csv``, replacing any previous one.
+    """
+    Upload an emissions table as ``emissions/emissions.csv``, replacing any previous one.
 
     Args:
         client: MLflow client.
@@ -348,7 +363,8 @@ def _upload_emissions(
 
 
 def log_emissions(model_name: str, rows: list[dict[str, Any]], experiment_name: str) -> None:
-    """Log the emission measurements of one model's training.
+    """
+    Log the emission measurements of one model's training.
 
     Under ``dvc exp run``, the rows are merged into the emissions table of the experiment's
     parent run, and the parent's ``train_*`` totals are recomputed from that table. Each
