@@ -1,10 +1,23 @@
-"""MLflow tracking for the training stage.
+"""MLflow tracking for the training and evaluation stages.
 
-One DVC experiment (``dvc exp run``) maps to one MLflow parent run, and each model trained by
-the ``train`` foreach stage logs a nested child run under it. Every ``train@<model>`` stage is
-a separate process, so the parent run is looked up by tags and reused instead of recreated.
-Parent and child runs record the DVC experiment name, git ref and restore commands, so a
-run can be reproduced from the MLflow UI with ``dvc exp pull`` + ``dvc exp apply``.
+This module groups every interaction with MLflow, so the pipeline stages only call a few
+functions. Under ``dvc exp run``, runs are organized in three levels:
+
+- Parent run: one per DVC experiment, named after it. It stores the experiment name, its base
+  commit, its Git ref, and the commands to restore it (``dvc exp pull`` + ``dvc exp apply``).
+  It also holds the emissions of the whole experiment: one CSV with every measurement of every
+  model, labelled by model and training step, and its totals.
+- Model run: one child run per model of the ``train`` foreach stage. It records the
+  hyperparameters, the cross-validation metrics of the best trial, the training split
+  (identified by the MD5 of the file, the same hash DVC stores in ``dvc.lock``), and the
+  emission totals of the model. The ``evaluate`` stage reopens it to add the test metrics, the
+  test split, and the most influential features.
+- Trial run: one run per Optuna trial, nested in the model run, with its sampled
+  hyperparameters, cross-validation metrics, and emissions.
+
+Each ``train@<model>`` stage is a separate process, so the parent run is looked up by its tags
+and reused instead of recreated. Outside ``dvc exp run`` (e.g. ``dvc repro``) there is no
+parent: each model gets a standalone run, which cannot be restored from MLflow.
 """
 
 from collections.abc import Iterator
@@ -12,6 +25,8 @@ from contextlib import contextmanager
 import hashlib
 import os
 from pathlib import Path
+import tempfile
+from typing import Any
 
 import mlflow
 from mlflow.data.pandas_dataset import from_pandas
@@ -19,6 +34,8 @@ from mlflow.data.sources import LocalArtifactDatasetSource
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 import pandas as pd
+
+from src.emissions import EMISSIONS_FILE, total_emissions
 
 EXP_NAME_TAG = "dvc.exp_name"
 BASELINE_REV_TAG = "dvc.baseline_rev"
@@ -29,6 +46,9 @@ NOTE_TAG = "mlflow.note.content"
 EXPS_NAMESPACE = "refs/exps"
 GIT_REMOTE = "origin"
 HASH_CHUNK_SIZE = 1 << 20
+EMISSIONS_ARTIFACT_DIR = "emissions"
+EMISSIONS_MODEL_COLUMN = "model"
+EMISSIONS_METRIC_PREFIX = "train"
 
 
 def get_dvc_exp_context() -> tuple[str | None, str | None]:
@@ -264,3 +284,98 @@ def start_trial_run(model_name: str, trial_number: int) -> Run:
         nested=True,
         tags={RUN_ROLE_TAG: "trial", MODEL_TAG: model_name},
     )
+
+
+def merge_emission_rows(
+    existing: pd.DataFrame | None, rows: list[dict[str, Any]], model_name: str
+) -> pd.DataFrame:
+    """Replace one model's rows in an experiment's emissions table.
+
+    Rows of ``model_name`` already in the table are dropped first, so retraining a model in
+    the same experiment replaces its measurements instead of duplicating them.
+
+    Args:
+        existing: Current emissions table of the experiment, or None if there is none yet.
+        rows: New measurements of the model, each with a ``model`` column.
+        model_name: Model whose rows are replaced.
+
+    Returns:
+        The merged emissions table.
+    """
+    new = pd.DataFrame(rows)
+    if existing is None:
+        return new
+    kept = existing[existing[EMISSIONS_MODEL_COLUMN] != model_name]
+    return pd.concat([kept, new], ignore_index=True)
+
+
+def _download_emissions(client: MlflowClient, run_id: str, tmp_dir: Path) -> pd.DataFrame | None:
+    """Download the emissions table of a run, if it has one.
+
+    Args:
+        client: MLflow client.
+        run_id: Run holding the table.
+        tmp_dir: Directory to download into.
+
+    Returns:
+        The emissions table, or None if the run has none yet.
+    """
+    artifact_path = f"{EMISSIONS_ARTIFACT_DIR}/{EMISSIONS_FILE}"
+    listed = {item.path for item in client.list_artifacts(run_id, EMISSIONS_ARTIFACT_DIR)}
+    if artifact_path not in listed:
+        return None
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    local_path = mlflow.artifacts.download_artifacts(
+        run_id=run_id, artifact_path=artifact_path, dst_path=str(tmp_dir)
+    )
+    return pd.read_csv(local_path)
+
+
+def _upload_emissions(
+    client: MlflowClient, run_id: str, table: pd.DataFrame, tmp_dir: Path
+) -> None:
+    """Upload an emissions table as ``emissions/emissions.csv``, replacing any previous one.
+
+    Args:
+        client: MLflow client.
+        run_id: Run to attach the table to.
+        table: Emissions table.
+        tmp_dir: Directory to write the CSV into before uploading.
+    """
+    csv_path = tmp_dir / EMISSIONS_FILE
+    table.to_csv(csv_path, index=False)
+    client.log_artifact(run_id, str(csv_path), artifact_path=EMISSIONS_ARTIFACT_DIR)
+
+
+def log_emissions(model_name: str, rows: list[dict[str, Any]], experiment_name: str) -> None:
+    """Log the emission measurements of one model's training.
+
+    Under ``dvc exp run``, the rows are merged into the emissions table of the experiment's
+    parent run, and the parent's ``train_*`` totals are recomputed from that table. Each
+    ``train@<model>`` stage is a separate process, so the table is rebuilt by each one in
+    turn. Outside ``dvc exp run`` there is no parent, so the rows go to the active run.
+
+    Args:
+        model_name: Model the measurements belong to.
+        rows: Measurements of the model, each with a ``model`` column.
+        experiment_name: MLflow experiment holding the runs.
+    """
+    client = MlflowClient()
+    exp_name, baseline_rev = get_dvc_exp_context()
+    with tempfile.TemporaryDirectory(prefix="emissions-") as tmp:
+        if not exp_name:
+            run_id = mlflow.active_run().info.run_id
+            _upload_emissions(client, run_id, pd.DataFrame(rows), Path(tmp))
+            return
+
+        experiment = client.get_experiment_by_name(experiment_name)
+        parent_id = find_or_create_parent_run(
+            client, experiment.experiment_id, exp_name, baseline_rev
+        )
+        existing = _download_emissions(client, parent_id, Path(tmp) / "download")
+        table = merge_emission_rows(existing, rows, model_name)
+        _upload_emissions(client, parent_id, table, Path(tmp))
+
+    totals = total_emissions(table.to_dict("records"), prefix=EMISSIONS_METRIC_PREFIX)
+    for key, value in totals.items():
+        client.log_metric(parent_id, key, value)

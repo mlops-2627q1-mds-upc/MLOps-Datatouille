@@ -31,7 +31,12 @@ def sample_df():
 
 @pytest.fixture
 def tracking_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
-    """Point MLflow to a throwaway local store and clear DVC experiment env vars."""
+    """Point MLflow to a throwaway local store and clear DVC experiment env vars.
+
+    Also runs the test inside ``tmp_path``, since MLflow writes artifacts of a local store
+    to ``./mlruns``.
+    """
+    monkeypatch.chdir(tmp_path)
     uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
     monkeypatch.setenv("MLFLOW_TRACKING_URI", uri)
     monkeypatch.delenv("DVC_EXP_NAME", raising=False)

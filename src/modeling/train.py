@@ -1,9 +1,19 @@
 """
-Training stage of the pipeline: hyperparameter tuning and training with Hydra, Optuna, and MLflow.
+Training stage of the pipeline: hyperparameter tuning and final training of one model.
 
-Each run tunes one model with a seeded Optuna study, refits the best hyperparameters on the
-whole train set, and writes the model plus the CV metrics of the best trial. MLflow runs are
-nested as DVC experiment > model > trial (see src.modeling.tracking).
+DVC runs this stage once per model listed in ``params.yaml`` (``train`` foreach stage). Each run:
+
+1. Reads its configuration with Hydra (``conf/train.yaml`` and ``conf/model/<name>.yaml``,
+   which defines the search space). DVC passes its tracked parameters as Hydra overrides.
+2. Runs a seeded Optuna study inside this process (``run_study``). Each trial evaluates the
+   full pipeline with stratified cross-validation. Hydra's Optuna sweeper is not used, since
+   it would launch one process per trial and break the single-command contract of a DVC
+   stage (see EDN-004).
+3. Refits the best hyperparameters on the whole training split and saves the model and the
+   cross-validation metrics of the best trial.
+
+Every trial and the final fit are measured with CodeCarbon. MLflow runs are nested as
+DVC experiment > model > trial (see ``src.modeling.tracking``).
 
 Usage (orchestrated by DVC):
     python -m src.modeling.train model=logreg metrics_out=reports/metrics/train/logreg.json
@@ -31,8 +41,14 @@ from sklearn.svm import LinearSVC
 
 from src.config import MLFLOW_EXPERIMENT_NAME
 from src.data.preprocess import make_tfidf
-from src.emissions import track_emissions
-from src.modeling.tracking import log_dataset, start_model_run, start_trial_run
+from src.emissions import emissions_record, total_emissions, track_emissions
+from src.modeling.tracking import (
+    EMISSIONS_METRIC_PREFIX,
+    log_dataset,
+    log_emissions,
+    start_model_run,
+    start_trial_run,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -41,6 +57,8 @@ TEXT_COL = "clean_text"
 SCORING = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 TUNING_METRIC = "cv_f1_macro"
 CV_METRICS_ATTR = "cv_metrics"
+EMISSIONS_ATTR = "emissions"
+FINAL_STEP = "final"
 
 
 def get_classifier(
@@ -156,7 +174,8 @@ def run_study(
         count_columns: List of metadata count features for the numerical scaler.
 
     Returns:
-        The finished study. Each trial stores its CV metrics in the ``cv_metrics`` user attr.
+        The finished study. Each trial stores its CV metrics in the ``cv_metrics`` user attr
+        and its emissions measurement (a CodeCarbon CSV row) in the ``emissions`` one.
     """
 
     def objective(trial: optuna.Trial) -> float:
@@ -169,8 +188,11 @@ def run_study(
                 n_splits=cfg.train.cv_folds, shuffle=True, random_state=cfg.train.random_state
             )
 
-            with track_emissions(f"train_trial_{cfg.model.name}"):
+            with track_emissions(
+                f"train_trial_{cfg.model.name}", metric_prefix="train_trial"
+            ) as tracker:
                 scores = cross_validate(pipeline, X, y, cv=cv, scoring=SCORING)
+            trial.set_user_attr(EMISSIONS_ATTR, emissions_record(tracker))
 
             metrics = {
                 f"cv_{name}": round(float(scores[f"test_{name}"].mean()), 4) for name in SCORING
@@ -188,9 +210,24 @@ def run_study(
     return study
 
 
+def build_emission_row(model_name: str, step: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Label one emissions measurement with the model and training step it belongs to.
+
+    Args:
+        model_name: Name of the model being trained.
+        step: Training step, ``trial-<n>`` for a tuning trial or ``final`` for the final fit.
+        record: CodeCarbon measurement, as returned by ``emissions_record``.
+
+    Returns:
+        The measurement with ``model`` and ``step`` as its first columns.
+    """
+    return {"model": model_name, "step": step, **record}
+
+
 def train_and_evaluate(
     cfg: DictConfig, X: pd.DataFrame, y: pd.Series, count_columns: List[str]
-) -> Tuple[Pipeline, Dict[str, float]]:
+) -> Tuple[Pipeline, Dict[str, float], List[Dict[str, Any]]]:
     """
     Tune hyperparameters with Optuna and train the final pipeline with the best ones.
 
@@ -201,9 +238,17 @@ def train_and_evaluate(
         count_columns: List of metadata count features for the numerical scaler.
 
     Returns:
-        Tuple containing the optimal fitted Pipeline and the CV metrics of the best trial.
+        Tuple containing the optimal fitted Pipeline, the CV metrics of the best trial, and
+        the emissions measurements of every trial and of the final fit.
     """
     study = run_study(cfg, X, y, count_columns)
+    emission_rows = [
+        build_emission_row(
+            cfg.model.name, f"trial-{trial.number}", trial.user_attrs[EMISSIONS_ATTR]
+        )
+        for trial in study.trials
+        if EMISSIONS_ATTR in trial.user_attrs
+    ]
 
     best_trial = optuna.trial.FixedTrial(study.best_params)
     best_classifier = get_classifier(
@@ -211,10 +256,11 @@ def train_and_evaluate(
     )
     final_pipeline = build_pipeline(best_classifier, count_columns, cfg.train.max_features)
 
-    with track_emissions(f"train_final_{cfg.model.name}"):
+    with track_emissions(f"train_final_{cfg.model.name}", metric_prefix="train_final") as tracker:
         final_pipeline.fit(X, y)
+    emission_rows.append(build_emission_row(cfg.model.name, FINAL_STEP, emissions_record(tracker)))
 
-    return final_pipeline, study.best_trial.user_attrs[CV_METRICS_ATTR]
+    return final_pipeline, study.best_trial.user_attrs[CV_METRICS_ATTR], emission_rows
 
 
 def save_metrics(metrics: Dict[str, float], path: Path) -> None:
@@ -253,11 +299,13 @@ def main(cfg: DictConfig) -> None:
     }
     with start_model_run(cfg.model.name, MLFLOW_EXPERIMENT_NAME) as run:
         log_dataset(X, y, Path(cfg.data.train), context="training")
-        pipeline, metrics = train_and_evaluate(cfg, X, y, count_columns)
+        pipeline, metrics, emission_rows = train_and_evaluate(cfg, X, y, count_columns)
         classifier_params = pipeline.named_steps["classifier"].get_params()
         mlflow.log_params(params)
         mlflow.log_params({f"classifier.{key}": val for key, val in classifier_params.items()})
         mlflow.log_metrics(metrics)
+        mlflow.log_metrics(total_emissions(emission_rows, prefix=EMISSIONS_METRIC_PREFIX))
+        log_emissions(cfg.model.name, emission_rows, MLFLOW_EXPERIMENT_NAME)
         logger.info("Best cross-validation metrics: %s (MLflow run %s)", metrics, run.info.run_id)
 
     save_metrics(metrics, Path(cfg.metrics_out))

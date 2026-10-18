@@ -30,6 +30,24 @@ experiment, so its MLflow runs differ:
 
 Use `dvc repro` only for quick local checks, and `dvc exp run` for any run you want to keep.
 
+### Carbon emissions
+
+Training energy and CO2 are measured with CodeCarbon (`src/emissions.py`) and logged at every
+level of the run tree:
+
+| Run | Metrics | Artifact |
+|---|---|---|
+| Experiment (parent) | `train_*`: total of all models trained in the experiment | `emissions/emissions.csv`: one row per trial and final fit of every model |
+| Model | `train_*`: tuning trials + final fit; `train_final_*`: final fit only | none |
+| Trial | `train_trial_*`: that trial's cross-validation | none |
+
+Each `*` is `duration_s`, `energy_consumed_kwh` and `emissions_kg_co2eq`. Models whose training
+DVC skipped (cached) did not spend energy in the experiment, so they are not in its total.
+Outside `dvc exp run` there is no parent run, so the model run gets its own `emissions.csv`.
+
+The local `reports/emissions/emissions.csv` (gitignored) keeps every measurement ever made on
+your machine and is not uploaded to MLflow.
+
 ## Restore an experiment
 
 Find the experiment name in MLflow (parent run name, or the `dvc.exp_name` tag on the parent and model runs). Then:
