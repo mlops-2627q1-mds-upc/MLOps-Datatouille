@@ -1,20 +1,23 @@
-"""
-MLflow tracking module for the training stage.
+"""MLflow tracking for the training and evaluation stages.
 
-This module encapsulates all MLflow API interactions, establishing a strict reproducibility
-link between DVC's immutable data states and MLflow's runtime metrics.
+This module groups every interaction with MLflow, so the pipeline stages only call a few
+functions. Under ``dvc exp run``, runs are organized in three levels:
 
-Run Hierarchy:
-- Experiment: The top-level logical grouping (e.g., `spam-classifier`) for all candidate models.
-- Parent Run: Represents a specific model architecture (e.g., `logreg`). It captures the Git
-  commit hash, logs the training dataset's SHA-256 hash (via MLflow's Data API),
-  and handles the final registration of the optimal model artifact.
-- Nested Child Runs: Represent the individual Optuna hyperparameter trials executed by Hydra.
-  Each child run logs its specific parameter configuration and resulting cross-validation
-  metrics cleanly under the parent run.
+- Parent run: one per DVC experiment, named after it. It stores the experiment name, its base
+  commit, its Git ref, and the commands to restore it (``dvc exp pull`` + ``dvc exp apply``).
+  It also holds the emissions of the whole experiment: one CSV with every measurement of every
+  model, labelled by model and training step, and its totals.
+- Model run: one child run per model of the ``train`` foreach stage. It records the
+  hyperparameters, the cross-validation metrics of the best trial, the training split
+  (identified by the MD5 of the file, the same hash DVC stores in ``dvc.lock``), and the
+  emission totals of the model. The ``evaluate`` stage reopens it to add the test metrics, the
+  test split, and the most influential features.
+- Trial run: one run per Optuna trial, nested in the model run, with its sampled
+  hyperparameters, cross-validation metrics, and emissions.
 
-By capturing the dataset digest and Git code state in the parent run, any model registered
-in the MLflow UI can be exactly reproduced using DVC and Git.
+Each ``train@<model>`` stage is a separate process, so the parent run is looked up by its tags
+and reused instead of recreated. Outside ``dvc exp run`` (e.g. ``dvc repro``) there is no
+parent: each model gets a standalone run, which cannot be restored from MLflow.
 """
 
 from collections.abc import Iterator
