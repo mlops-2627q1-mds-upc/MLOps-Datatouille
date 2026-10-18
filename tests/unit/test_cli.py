@@ -38,6 +38,7 @@ def test_download_main(mock_download):
     mock_download.assert_called_once()
 
 
+@patch("src.modeling.evaluation.mlflow")
 @patch("src.modeling.evaluation.log_dataset")
 @patch("src.modeling.evaluation.joblib.load")
 @patch("src.modeling.evaluation.load_xy")
@@ -61,12 +62,15 @@ def test_download_main(mock_download):
         "f.json",
     ],
 )
-def test_evaluation_main(mock_compute, mock_stf, mock_sm, mock_smr, mock_lxy, mock_jload, mock_ld):
+def test_evaluation_main(
+    mock_compute, mock_stf, mock_sm, mock_smr, mock_lxy, mock_jload, mock_ld, mock_mlflow
+):
     mock_lxy.return_value = (MagicMock(), MagicMock(), MagicMock())
     mock_compute.return_value = {"test_metric": 1.0}
     eval_main()
     mock_jload.assert_called_once()
     mock_ld.assert_called_once()
+    mock_mlflow.log_metrics.assert_called_once_with({"test_metric": 1.0})
     mock_sm.assert_called_once()
 
 
