@@ -202,5 +202,9 @@ cython_debug/
 # CodeCarbon: raw per-machine measurements
 reports/emissions/*.csv
 
+# MLflow: local tracking store (SQLite DB and run artifacts)
+mlflow.db
+mlruns/
+
 # UV
 uv.lock

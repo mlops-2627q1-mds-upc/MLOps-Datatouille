@@ -106,11 +106,22 @@ def configure_context() -> gx.Checkpoint:
     """
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
-    data_source = context.data_sources.add_or_update_pandas_filesystem(
-        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR_REL
-    )
-    asset = data_source.add_csv_asset(name=ASSET_NAME)
-    batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)
+    try:
+        data_source = context.data_sources.get(DATA_SOURCE_NAME)
+    except LookupError:
+        data_source = context.data_sources.add_pandas_filesystem(
+            name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR_REL
+        )
+
+    try:
+        asset = data_source.get_asset(ASSET_NAME)
+    except LookupError:
+        asset = data_source.add_csv_asset(name=ASSET_NAME)
+
+    try:
+        batch_definition = asset.get_batch_definition(BATCH_NAME)
+    except LookupError:
+        batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)
 
     suite = gx.ExpectationSuite(name=SUITE_NAME)
     for expectation in build_expectations():
