@@ -88,13 +88,13 @@ stages:
       md5: 5831379fe5ebc2d19232e926f4d0e780
       size: 4365
   download:
-    cmd: python -m src.download_dataset --dataset-id 
+    cmd: python -m src.data.download_dataset --dataset-id 
       diegovelilla/email-classification-dataset --output data/raw/raw.csv
     deps:
-    - path: src/download_dataset.py
+    - path: src/data/download_dataset.py
       hash: md5
-      md5: 463392979eeb0476828e9f4bc8d03420
-      size: 1504
+      md5: d4929d53f11d9052c8eb72ce7685b1ef
+      size: 1506
       isexec: true
     params:
       params.yaml:

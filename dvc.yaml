@@ -1,11 +1,11 @@
 stages:
   download:
     cmd: >-
-      python -m src.download_dataset
+      python -m src.data.download_dataset
       --dataset-id ${data.hf_id}
       --output ${data.raw}
     deps:
-      - src/download_dataset.py
+      - src/data/download_dataset.py
     params:
       - data.hf_id
       - data.raw

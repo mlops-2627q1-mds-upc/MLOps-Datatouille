@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.download_dataset import download_dataset
+from src.data.download_dataset import download_dataset
 
 
 def test_download_dataset_writes_csv_and_returns_path(tmp_path: Path) -> None:
@@ -17,8 +17,10 @@ def test_download_dataset_writes_csv_and_returns_path(tmp_path: Path) -> None:
     splits = {"train": fake_split}
 
     with (
-        patch("src.download_dataset.load_dataset", return_value=splits) as mock_load,
-        patch("src.download_dataset.concatenate_datasets", return_value=merged) as mock_concat,
+        patch("src.data.download_dataset.load_dataset", return_value=splits) as mock_load,
+        patch(
+            "src.data.download_dataset.concatenate_datasets", return_value=merged
+        ) as mock_concat,
     ):
         result = download_dataset(dataset_id="org/fake-dataset", output_path=output_path)
 

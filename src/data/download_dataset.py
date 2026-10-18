@@ -2,7 +2,7 @@
 Download the raw spam dataset from Hugging Face.
 
 Usage (from the root of the repo):
-    python -m src.download_dataset \
+    python -m src.data.download_dataset \
         --dataset-id diegovelilla/email-classification-dataset \
         --output data/raw/raw.csv
 """
@@ -13,8 +13,10 @@ from pathlib import Path
 from datasets import concatenate_datasets, load_dataset
 from loguru import logger
 
+from src.config import RAW_DATA_DIR
+
 DATASET_ID = "diegovelilla/email-classification-dataset"
-RAW_PATH = Path(__file__).resolve().parents[1] / "data" / "raw" / "raw.csv"
+RAW_PATH = RAW_DATA_DIR / "raw.csv"
 
 
 def download_dataset(
