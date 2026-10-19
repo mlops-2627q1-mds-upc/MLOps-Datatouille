@@ -63,7 +63,7 @@ The model is the spam detection component of a wider message-analysis system tha
 - **Shared by:** Team Datatouille, GitHub organization mlops-2627q1-mds-upc
 - **Model type:** Supervised binary text classifier (multinomial Naive Bayes on TF-IDF and count features)
 - **Language(s) (NLP):** English
-- **License:** Apache 2.0, as stated in the `LICENSE` file of the repository
+- **License:** Apache 2.0, as stated in the `LICENSE` file of the Hugging Face repository
 - **Finetuned from model:** Not applicable. The model is a classical machine learning classifier trained from scratch on the project data.
 
 ### Model Sources
