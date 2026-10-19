@@ -26,4 +26,4 @@
 
 [ ] Other: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-**Other Evidence (optional):** `src/data/preprocess.py` (`EMAIL_PATTERN`, `PHONE_PATTERN`, `anonymize_text`), `tests/unit/test_anonymization.py`, and the Great Expectations suite in `gx/expectations/processed_spam_dataset_suite.json`.
+**Other Evidence (optional):** `src/data/preprocess.py` (`EMAIL_PATTERN`, `PHONE_PATTERN`, `anonymize_text`), `tests/unit/test_anonymization.py`, and the Great Expectations suite defined in `src/data/gx_context_configuration.py` (`build_expectations`).

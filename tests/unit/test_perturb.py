@@ -1,4 +1,6 @@
-"""Unit tests for the controlled changes of messages in src/data/perturb.py."""
+"""
+Unit tests for the controlled changes of messages in tests/perturb.py.
+"""
 
 import random
 
@@ -6,7 +8,7 @@ import pandas as pd
 import pytest
 
 from src.data import preprocess as pp
-from src.data.perturb import (
+from tests.perturb import (
     append_text,
     obfuscate_urls,
     perturb_dataframe,
@@ -17,7 +19,9 @@ from src.data.perturb import (
 
 @pytest.fixture
 def cleaned_df() -> pd.DataFrame:
-    """Small dataset with the same columns as the output of the cleaning stage."""
+    """
+    Small dataset with the same columns as the output of the cleaning stage.
+    """
     df = pd.DataFrame(
         {
             "text": [
@@ -62,14 +66,18 @@ def test_perturb_text_preserves_whitespace() -> None:
 
 
 def test_perturb_dataframe_is_reproducible(cleaned_df: pd.DataFrame) -> None:
-    """The same seed always produces the same perturbed dataset."""
+    """
+    The same seed always produces the same perturbed dataset.
+    """
     first = perturb_dataframe(cleaned_df, seed=42)
     second = perturb_dataframe(cleaned_df, seed=42)
     pd.testing.assert_frame_equal(first, second)
 
 
 def test_perturb_dataframe_keeps_rows_labels_and_columns(cleaned_df: pd.DataFrame) -> None:
-    """Perturbation changes the text but not the rows, the labels, or the columns."""
+    """
+    Perturbation changes the text but not the rows, the labels, or the columns.
+    """
     perturbed = perturb_dataframe(cleaned_df, seed=42)
     assert len(perturbed) == len(cleaned_df)
     assert list(perturbed.columns) == list(cleaned_df.columns)
@@ -78,7 +86,9 @@ def test_perturb_dataframe_keeps_rows_labels_and_columns(cleaned_df: pd.DataFram
 
 
 def test_perturb_dataframe_recomputes_derived_columns(cleaned_df: pd.DataFrame) -> None:
-    """Count features and normalized text are recomputed from the perturbed text."""
+    """
+    Count features and normalized text are recomputed from the perturbed text.
+    """
     perturbed = perturb_dataframe(cleaned_df, seed=42)
     assert perturbed["n_urls"].sum() == 0
     assert cleaned_df["n_urls"].sum() == 2
@@ -86,14 +96,18 @@ def test_perturb_dataframe_recomputes_derived_columns(cleaned_df: pd.DataFrame) 
 
 
 def test_perturb_dataframe_does_not_modify_the_input(cleaned_df: pd.DataFrame) -> None:
-    """The original dataset is left untouched."""
+    """
+    The original dataset is left untouched.
+    """
     original = cleaned_df.copy()
     perturb_dataframe(cleaned_df, seed=42)
     pd.testing.assert_frame_equal(cleaned_df, original)
 
 
 def test_append_text_adds_the_suffix_and_recomputes(cleaned_df: pd.DataFrame) -> None:
-    """The suffix is appended to every message and the derived columns are updated."""
+    """
+    The suffix is appended to every message and the derived columns are updated.
+    """
     extended = append_text(cleaned_df, "Click here to claim your free prize")
     assert extended["text"].str.endswith("Click here to claim your free prize").all()
     assert (extended["n_words"] > cleaned_df["n_words"]).all()

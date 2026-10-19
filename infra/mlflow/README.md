@@ -1,11 +1,15 @@
-# Local MLflow
+# Local MLflow (DEPRECATED)
+
+> **Deprecated.** This local Docker MLflow server is not used by the project.
+> Tracking runs against DagsHub instead, configured via `MLFLOW_TRACKING_URI`
+> in the repo `.env` (see `env.example`). This folder is kept for reference only.
 
 Requirements: Docker Desktop / Docker Engine with Compose v2 (`docker compose`).
 
 ## Quick start
 
 ```bash
-cd docker/mlflow
+cd infra/mlflow
 
 cp env.example .env
 

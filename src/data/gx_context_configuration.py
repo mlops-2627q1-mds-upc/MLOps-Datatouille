@@ -1,4 +1,5 @@
-"""Great Expectations configuration: what the cleaned dataset must look like.
+"""
+Great Expectations configuration: what the cleaned dataset must look like.
 
 Creates (or updates) the GX file context in gx/ with:
     - a pandas data source pointing to data/processed/,
@@ -60,9 +61,14 @@ CHECKPOINT_NAME = "processed_spam_dataset_checkpoint"
 VALIDATION_REPORT = ROOT_DIR / "data" / "processed" / "gx_validation.json"
 
 
-def build_expectations():
-    """Expectations that the cleaned dataset must meet before splitting."""
-    expectations = [
+def build_expectations() -> list[gxe.Expectation]:
+    """
+    Build the expectations that the cleaned dataset must meet before splitting.
+
+    Returns:
+        The list of Great Expectations expectations.
+    """
+    expectations: list[gxe.Expectation] = [
         gxe.ExpectTableColumnsToMatchOrderedList(column_list=EXPECTED_COLUMNS),
         gxe.ExpectTableRowCountToBeBetween(min_value=1),
         gxe.ExpectColumnValuesToNotBeNull(column=TEXT_COL),
@@ -91,15 +97,31 @@ def build_expectations():
     return expectations
 
 
-def configure_context():
-    """Create or update the GX context, data source, suite, validation and checkpoint."""
+def configure_context() -> gx.Checkpoint:
+    """
+    Create or update the GX context, data source, suite, validation and checkpoint.
+
+    Returns:
+        The configured checkpoint.
+    """
     context = gx.get_context(mode="file", project_root_dir=ROOT_DIR)
 
-    data_source = context.data_sources.add_or_update_pandas_filesystem(
-        name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR_REL
-    )
-    asset = data_source.add_csv_asset(name=ASSET_NAME)
-    batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)
+    try:
+        data_source = context.data_sources.get(DATA_SOURCE_NAME)
+    except LookupError:
+        data_source = context.data_sources.add_pandas_filesystem(
+            name=DATA_SOURCE_NAME, base_directory=PROCESSED_DIR_REL
+        )
+
+    try:
+        asset = data_source.get_asset(ASSET_NAME)
+    except LookupError:
+        asset = data_source.add_csv_asset(name=ASSET_NAME)  # type: ignore[attr-defined]
+
+    try:
+        batch_definition = asset.get_batch_definition(BATCH_NAME)
+    except LookupError:
+        batch_definition = asset.add_batch_definition_path(name=BATCH_NAME, path=PROCESSED_FILE)
 
     suite = gx.ExpectationSuite(name=SUITE_NAME)
     for expectation in build_expectations():
@@ -119,7 +141,8 @@ def configure_context():
     return checkpoint
 
 
-def main():
+def main() -> None:
+    """Run the checkpoint and write the validation report, failing on unmet expectations."""
     checkpoint = configure_context()
     logger.info("Validating %s", PROCESSED_DIR / PROCESSED_FILE)
     result = checkpoint.run()
@@ -128,6 +151,9 @@ def main():
     for validation_result in result.run_results.values():
         for res in validation_result.results:
             config = res.expectation_config
+            if config is None:
+                logger.warning("Skipping expectation result without configuration")
+                continue
             status = "OK  " if res.success else "FAIL"
             logger.info("%s %s %s", status, config.type, config.kwargs.get("column", ""))
             expectation_results.append(

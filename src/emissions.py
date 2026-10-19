@@ -1,12 +1,14 @@
-"""Energy and CO2 tracking for pipeline stages, built on CodeCarbon."""
+"""
+Energy and CO2 tracking for pipeline stages, built on CodeCarbon.
+"""
 
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
+import logging
 from pathlib import Path
 from typing import Any
 
 from codecarbon import OfflineEmissionsTracker
-from loguru import logger
 import mlflow
 
 from src.config import (
@@ -18,6 +20,8 @@ from src.config import (
 )
 
 EMISSIONS_FILE = "emissions.csv"
+
+logger = logging.getLogger(__name__)
 
 # CodeCarbon CSV column -> name of the figure in summaries and MLflow metrics
 SUMMARY_COLUMNS = {
@@ -32,7 +36,8 @@ def build_tracker(
     output_dir: Path = EMISSIONS_DIR,
     measure_power_secs: float | None = None,
 ) -> OfflineEmissionsTracker:
-    """Create an offline CodeCarbon tracker for one pipeline stage.
+    """
+    Create an offline CodeCarbon tracker for one pipeline stage.
 
     Args:
         stage: Pipeline stage name (e.g. "features", "train", "predict").
@@ -61,7 +66,8 @@ def build_tracker(
 
 
 def emissions_summary(tracker: OfflineEmissionsTracker) -> dict[str, float]:
-    """Extract the key energy and CO2 figures from a stopped tracker.
+    """
+    Extract the key energy and CO2 figures from a stopped tracker.
 
     Args:
         tracker: A tracker on which `stop()` has already been called.
@@ -73,7 +79,8 @@ def emissions_summary(tracker: OfflineEmissionsTracker) -> dict[str, float]:
 
 
 def emissions_record(tracker: OfflineEmissionsTracker) -> dict[str, Any]:
-    """Return the full measurement of a stopped tracker, as one row of the CodeCarbon CSV.
+    """
+    Return the full measurement of a stopped tracker, as one row of the CodeCarbon CSV.
 
     Args:
         tracker: A tracker on which `stop()` has already been called.
@@ -87,7 +94,8 @@ def emissions_record(tracker: OfflineEmissionsTracker) -> dict[str, Any]:
 def total_emissions(
     records: Iterable[Mapping[str, Any]], prefix: str | None = None
 ) -> dict[str, float]:
-    """Sum the duration, energy and emissions of several measurements.
+    """
+    Sum the duration, energy and emissions of several measurements.
 
     Args:
         records: Rows as returned by `emissions_record`.
@@ -105,7 +113,8 @@ def total_emissions(
 
 
 def _log_to_mlflow(prefix: str, summary: dict[str, float]) -> None:
-    """Log the emission figures to the active MLflow run, if there is one.
+    """
+    Log the emission figures to the active MLflow run, if there is one.
 
     Args:
         prefix: Metric name prefix, e.g. "train_final" -> "train_final_duration_s".
@@ -123,7 +132,8 @@ def track_emissions(
     measure_power_secs: float | None = None,
     metric_prefix: str | None = None,
 ) -> Iterator[OfflineEmissionsTracker]:
-    """Measure energy and CO2 of the wrapped block and record the result.
+    """
+    Measure energy and CO2 of the wrapped block and record the result.
 
     The result is appended to `<output_dir>/emissions.csv` and, if an MLflow
     run is active, logged as `<metric_prefix>_*` metrics. The CSV is not uploaded
@@ -151,7 +161,10 @@ def track_emissions(
         tracker.stop()
         summary = emissions_summary(tracker)
         logger.info(
-            f"[{stage}] {summary['energy_consumed_kwh']:.3g} kWh, "
-            f"{summary['emissions_kg_co2eq']:.3g} kg CO2eq in {summary['duration_s']:.1f} s"
+            "[%s] %.3g kWh, %.3g kg CO2eq in %.1f s",
+            stage,
+            summary["energy_consumed_kwh"],
+            summary["emissions_kg_co2eq"],
+            summary["duration_s"],
         )
         _log_to_mlflow(metric_prefix or stage, summary)

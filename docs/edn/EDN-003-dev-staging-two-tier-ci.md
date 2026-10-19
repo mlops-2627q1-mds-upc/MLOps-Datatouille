@@ -6,7 +6,7 @@
 
 **Decision Participants:** All team members
 
-**Decision:** Extend GitHub Flow with a `dev` staging branch and two-tier CI: task branches merge from and to `dev` with fast checks only (Ruff, `tests/unit/`, sample Great Expectations); only `dev` merges to `main` with full validation (full Great Expectations suite, `tests/regression/`). Protect `main` and `dev` with Rulesets. Task branches are squash merged into `dev`, and `dev` is promoted to `main` with a merge commit.
+**Decision:** Extend GitHub Flow with a `dev` staging branch and two-tier CI: task branches merge from and to `dev` with fast checks only (Ruff, mypy, `tests/unit/`, `tests/integration/` with a coverage gate, including Great Expectations tests on in-memory samples); only `dev` merges to `main` with full validation (Great Expectations checkpoint on the full dataset, `tests/regression/` for every model). Protect `main` and `dev` with Rulesets. Task branches are squash merged into `dev`, and `dev` is promoted to `main` with a merge commit.
 
 **Rationale:** Plain GitHub Flow (task branch directly to `main`) gives no place to validate new changes before production. Running heavy regression tests and full-dataset GX checks on every task PR is computationally wasteful and unnecessary. This way we can catch issues early in the `dev` branch while keeping fast feedback on task PRs.
 

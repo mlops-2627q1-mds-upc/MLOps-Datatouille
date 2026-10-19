@@ -1,4 +1,5 @@
-"""Phase 4 of the pipeline: evaluation of a trained model on the held-out test set.
+"""
+Phase 4 of the pipeline: evaluation of a trained model on the held-out test set.
 
 Usage (from the root of the repo):
     python -m src.modeling.evaluation --model logreg \
@@ -30,7 +31,8 @@ logger = logging.getLogger(__name__)
 
 
 def compute_test_metrics(y_true: pd.Series, y_pred: pd.Series) -> dict[str, float]:
-    """Compute test-set classification metrics.
+    """
+    Compute test-set classification metrics.
 
     Args:
         y_true: True labels.
@@ -49,7 +51,8 @@ def compute_test_metrics(y_true: pd.Series, y_pred: pd.Series) -> dict[str, floa
 
 
 def save_top_features(features: dict, path: Path) -> None:
-    """Write the most influential features as JSON so DVC can version them.
+    """
+    Write the most influential features as JSON so DVC can version them.
 
     Args:
         features: Output of ``top_features``.

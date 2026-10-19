@@ -1,4 +1,5 @@
-"""Selection stage: choice of the best trained model by a cross-validation metric.
+"""
+Selection stage: choice of the best trained model by a cross-validation metric.
 
 The selection writes a pointer to the best model (name, metric, value and path) instead of
 copying it, so each model is stored only once. Test metrics are not used, so the test set
@@ -27,7 +28,8 @@ MODEL_EXTENSION = ".joblib"
 
 
 def load_cv_metrics(metrics_dir: Path, models: list[str]) -> dict[str, dict[str, float]]:
-    """Load the cross-validation metrics written by the training stage.
+    """
+    Load the cross-validation metrics written by the training stage.
 
     Args:
         metrics_dir: Directory holding one ``<model>.json`` file per model.
@@ -48,7 +50,8 @@ def load_cv_metrics(metrics_dir: Path, models: list[str]) -> dict[str, dict[str,
 def select_best_model(
     metrics_by_model: dict[str, dict[str, float]], metric: str
 ) -> tuple[str, float]:
-    """Select the model with the highest value of ``metric``.
+    """
+    Select the model with the highest value of ``metric``.
 
     Ties are broken by the order of ``metrics_by_model``, so the result is deterministic.
 
@@ -74,7 +77,8 @@ def select_best_model(
 def build_selection(
     model: str, metric: str, value: float, models_dir: Path
 ) -> dict[str, str | float]:
-    """Build the pointer to the selected model.
+    """
+    Build the pointer to the selected model.
 
     Args:
         model: Name of the selected model.

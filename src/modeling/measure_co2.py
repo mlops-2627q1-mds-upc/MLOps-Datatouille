@@ -173,7 +173,8 @@ def _gpu_model() -> str:
 
 
 def collect_hardware(measure_power_secs: float) -> dict[str, str | float | int | None]:
-    """Capture the machine and tracking setup behind a measurement run.
+    """
+    Capture the machine and tracking setup behind a measurement run.
 
     Called once per experiment; the result is embedded in every run record so
     numbers always travel with the hardware that produced them.

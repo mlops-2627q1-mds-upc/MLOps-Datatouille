@@ -1,4 +1,4 @@
-# Contributing Guidelines — Spam Detection ML System
+# Contributing Guidelines — Intelligent Message Analysis System
 Here you can find the documentation to maintain high code quality, system reproducibility, and good collaboration. All team members must follow this guide for every contribution.
 
 ---
@@ -87,14 +87,14 @@ git push -u origin <branch-name>
 ### Step 5: Automated CI Gate (`dev`) & Peer Review
 * **Automated Status Check:** GitHub Actions triggers the Fast Feedback & Code Integration job:
   - Enforces Ruff linting (`ruff check src tests`) and formatting (`ruff format --check src tests`) per `pyproject.toml`.
-  - Executes unit tests under tests/unit/ (FastAPI route schemas, helper logic).
-  - Executes lightweight Great Expectations schema checks on sample data.
+  - Enforces type checking (`mypy src` per `[tool.mypy]` in `pyproject.toml`).
+  - Executes hermetic unit and integration tests (`tests/unit/`, `tests/integration/`) with a coverage gate (`--cov-fail-under=80`). No DVC data needed: the data-dependent test skips itself when the data is not checked out.
 * **Peer Review:** Reviewers inspect the code diff and verify that logic and formatting standards are maintained.
 
-### Step 6: Squash and Merge
-Our repository is configured to strictly enforce **Squash and Merge**.
-* Once approved and all CI checks pass, click Squash and merge.
-* Ensure the final squashed commit message adheres to the 7 Git commit rules, summarizing the entire PR.
+### Step 6: Merge (Squash into `dev`, Merge Commit into `main`)
+* **Task -> `dev`**: click **Squash and merge**. Squashing keeps `dev` linear and makes each task a single revertable commit.
+* **`dev` -> `main`**: use a **regular merge commit** (not squash). Squashing `dev` into `main` would make the histories diverge, so future `dev -> main` PRs would re-show already-merged commits or conflict.
+* Ensure the final squashed commit message (task -> `dev`) adheres to the 7 Git commit rules, summarizing the entire PR.
 * Delete the feature branch after merging to keep the repository clean:
     ```bash
     git checkout dev
@@ -110,6 +110,7 @@ When a sprint milestone is complete and integrated within dev, code is promoted 
 1. Open a Pull Request configuring: `base: main` $\leftarrow$ `compare: dev`
 2. **Automated CI Gate (`main`)**: GitHub Actions triggers the Comprehensive Pre-Production Validation job:
    - Source Verification: Fails immediately if the PR originates from any branch other than `dev`.
+   - Static Analysis Re-Run: Ruff linting/formatting and `mypy src` type checking run again, never trusting the green from the `dev` gate.
    - Full Data Pipeline Validation: Executes complete Great Expectations suites against the full dataset to prevent the data from schema corruption.
    - Automated Regression Testing: Runs tests/regression/ using Pytest to ensure model accuracy, classification boundaries, and confidence scores exceed our baselines.
    - Multi-Component Integration: Validates full integration of the spam classifier, the secondary text component (summarizer or multilabel classifier), and endpoints.
@@ -126,7 +127,7 @@ When a sprint milestone is complete and integrated within dev, code is promoted 
 
 Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 
-* Keep lines short (max 127 chars to pass CI, aim for ~99).
+* Keep lines short (max 99 chars: the ruff `line-length` in `pyproject.toml`).
 * Use blank lines to separate logic:
     * 2 blank lines around top-level functions and classes.
     * 1 blank line around methods inside a class.
@@ -162,6 +163,9 @@ Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 * Use Google Style docstrings.
 * Include: short summary, `Args:`, `Returns:`, `Raises:` (if applicable).
 * Keep summary in imperative mood and in one line.
+* Start the content on the line after the opening `"""` (a new line right after the quotes). Ruff `D213` enforces this for every multi-line docstring.
+* Tests (`tests/`): document the behaviour with a short summary only. Do not add `Args:` or
+  `Returns:` for pytest fixtures or `@pytest.mark.parametrize` arguments.
 
 Example:
 ```python

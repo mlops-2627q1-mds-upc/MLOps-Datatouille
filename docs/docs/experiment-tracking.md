@@ -23,9 +23,7 @@ experiment, so its MLflow runs differ:
 
 - There is no parent run. Each model gets a standalone run named after the model (e.g.
   `logreg`), with its Optuna trial runs nested under it.
-- Train and test metrics end up in **different runs**: evaluation cannot tell which training run
-  belongs to the same pipeline execution, so it starts a new standalone run with the test
-  metrics instead of resuming the training one.
+- The evaluation stage reopens the latest standalone run of the model, so training and test metrics end up in the same run (see the limitations below).
 - The runs have no `dvc.exp_name` or `dvc.exp_ref` tags, so they cannot be restored.
 
 Use `dvc repro` only for quick local checks, and `dvc exp run` for any run you want to keep.
