@@ -33,7 +33,11 @@ jobs:
         run: |
           ruff check src tests
           ruff format --check src tests
-      
+
+      - name: Type Check (Mypy)
+        run: |
+          mypy src
+
       - name: Run Unit and Integration Tests
         run: |
           pytest tests/unit tests/integration -v -k "not test_processed_data" --cov=src --cov-fail-under=80
@@ -67,11 +71,15 @@ jobs:
           pip install pytest great_expectations fastapi httpx
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      - name: Type Check (Mypy)
+        run: |
+          mypy src
+
       - name: Configure DVC remote credentials
         run: |
           dvc remote modify origin --local access_key_id ${{ secrets.DAGSHUB_TOKEN }}
           dvc remote modify origin --local secret_access_key ${{ secrets.DAGSHUB_TOKEN }}
-          
+
       - name: Pull data and models
         run: dvc pull
         

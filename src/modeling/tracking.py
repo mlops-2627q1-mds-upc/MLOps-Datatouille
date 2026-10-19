@@ -279,6 +279,7 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
     parent_id = find_or_create_parent_run(client, experiment.experiment_id, exp_name, baseline_rev)
     child_tags = build_lookup_tags(exp_name, baseline_rev, "child") | {MODEL_TAG: model_name}
     child_id = find_latest_run(client, experiment.experiment_id, child_tags) if resume else None
+    child_args: dict[str, Any]
     if child_id:
         child_args = {"run_id": child_id}
     else:
