@@ -68,7 +68,7 @@ def build_expectations() -> list[gxe.Expectation]:
     Returns:
         The list of Great Expectations expectations.
     """
-    expectations = [
+    expectations: list[gxe.Expectation] = [
         gxe.ExpectTableColumnsToMatchOrderedList(column_list=EXPECTED_COLUMNS),
         gxe.ExpectTableRowCountToBeBetween(min_value=1),
         gxe.ExpectColumnValuesToNotBeNull(column=TEXT_COL),
@@ -116,7 +116,7 @@ def configure_context() -> gx.Checkpoint:
     try:
         asset = data_source.get_asset(ASSET_NAME)
     except LookupError:
-        asset = data_source.add_csv_asset(name=ASSET_NAME)
+        asset = data_source.add_csv_asset(name=ASSET_NAME)  # type: ignore[attr-defined]
 
     try:
         batch_definition = asset.get_batch_definition(BATCH_NAME)
@@ -151,6 +151,9 @@ def main() -> None:
     for validation_result in result.run_results.values():
         for res in validation_result.results:
             config = res.expectation_config
+            if config is None:
+                logger.warning("Skipping expectation result without configuration")
+                continue
             status = "OK  " if res.success else "FAIL"
             logger.info("%s %s %s", status, config.type, config.kwargs.get("column", ""))
             expectation_results.append(

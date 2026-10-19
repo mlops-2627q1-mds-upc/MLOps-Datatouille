@@ -33,9 +33,10 @@ from typing import Any
 
 import mlflow
 from mlflow.data.pandas_dataset import from_pandas
-from mlflow.data.sources import LocalArtifactDatasetSource
+from mlflow.data.sources import LocalArtifactDatasetSource  # type: ignore[attr-defined]
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
+from mlflow.tracking.fluent import ActiveRun
 import pandas as pd
 
 from src.emissions import EMISSIONS_FILE, total_emissions
@@ -291,7 +292,7 @@ def start_model_run(model_name: str, experiment_name: str, resume: bool = False)
         yield run
 
 
-def start_trial_run(model_name: str, trial_number: int) -> Run:
+def start_trial_run(model_name: str, trial_number: int) -> ActiveRun:
     """
     Start the MLflow run of one hyperparameter-search trial, nested in the active run.
 
@@ -394,11 +395,16 @@ def log_emissions(model_name: str, rows: list[dict[str, Any]], experiment_name: 
     exp_name, baseline_rev = get_dvc_exp_context()
     with tempfile.TemporaryDirectory(prefix="emissions-") as tmp:
         if not exp_name:
-            run_id = mlflow.active_run().info.run_id
+            active_run = mlflow.active_run()
+            if active_run is None:
+                raise RuntimeError("log_emissions requires an active MLflow run")
+            run_id = active_run.info.run_id
             _upload_emissions(client, run_id, pd.DataFrame(rows), Path(tmp))
             return
 
         experiment = client.get_experiment_by_name(experiment_name)
+        if experiment is None:
+            raise RuntimeError(f"MLflow experiment '{experiment_name}' does not exist")
         parent_id = find_or_create_parent_run(
             client, experiment.experiment_id, exp_name, baseline_rev
         )
