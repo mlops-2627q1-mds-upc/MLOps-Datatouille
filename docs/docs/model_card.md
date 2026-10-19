@@ -168,7 +168,7 @@ The same procedure was applied to logistic regression, linear SVM and random for
 | Linear SVM | 0.9972 |
 | Random forest | 0.9955 |
 
-The comparison scores in this table come from the separate energy benchmark described in the Environmental Impact section, which used default hyperparameters. Independently, the tuned Naive Bayes run achieved a cross-validation macro F1 of 0.9978 (standard deviation 0.0004). The benchmark and tuned training run are distinct evaluations.
+The comparison scores in this table come from the separate energy benchmark described in the Environmental Impact section, which used fixed hyperparameters. Independently, the tuned Naive Bayes run achieved a cross-validation macro F1 of 0.9978 (standard deviation 0.0004). The benchmark and tuned training run are distinct evaluations.
 
 #### Speeds, Sizes, Times
 
@@ -187,7 +187,7 @@ The model was evaluated on the held-out test split of 2,126 messages, which keep
 
 #### Factors
 
-The evaluation was disaggregated by two factors. The first factor is the class, through macro-averaged metrics that give the same weight to spam and to legitimate messages. The second factor is the robustness to changes in the writing of a message. The tests in `tests/regression/test_robustness.py` apply three perturbations that should not change the label. These perturbations are random changes of letter case (20% of the letters), typos made by swapping two adjacent letters (10% of the words with at least four letters), and obfuscated URLs (`http` written as `hxxp` and dots written as `[.]`). The count features and the normalized text are recomputed after each perturbation, so the model receives the modified messages exactly as it would in production. A directional test also appends a typical spam sentence to every legitimate message and checks that the spam probability does not decrease.
+The evaluation was disaggregated by two factors. The first factor is the class, through macro-averaged metrics that give the same weight to spam and to legitimate messages. The second factor is the robustness to changes in the writing of a message. The tests in `tests/regression/test_robustness.py` apply three perturbations that should not change the label. These perturbations are random changes of letter case (20% of the words are converted to upper or lower case), typos made by swapping two adjacent letters (10% of the words with at least four letters), and obfuscated URLs (`http` written as `hxxp` and dots written as `[.]`). The count features and the normalized text are recomputed after each perturbation, so the model receives the modified messages exactly as it would in production. A directional test also appends a typical spam sentence to every legitimate message and checks that the spam probability does not decrease.
 
 #### Metrics
 
@@ -251,7 +251,7 @@ Energy consumption and emissions were measured with [CodeCarbon](https://codecar
 
 According to the confirmed MLflow run values, these figures correspond to the `final` fit with alpha = 0.1329 inside the DVC pipeline, not the Optuna trials or the full training stage. In the pipeline, CodeCarbon reads the power every 15 seconds, so a fit that lasts less than one second relies on very few readings and the value is only indicative. The Optuna trials were measured separately and logged in MLflow.
 
-For a reliable comparison between models, a separate benchmark (`src/modeling/measure_co2.py`) was run on the same laptop. Each model was trained with its default hyperparameters (alpha = 1.0 for Naive Bayes) through 5-fold cross-validation and a final fit. This procedure was repeated 5 times per model, the models were interleaved with a cooldown pause to limit thermal effects, and the power was read every second. The results are stored in `reports/emissions/co2_runs.jsonl`.
+For a reliable comparison between models, a separate benchmark (`src/modeling/measure_co2.py`) was run on the same laptop. Each model was trained with fixed hyperparameters (alpha = 1.0 for Naive Bayes) through 5-fold cross-validation and a final fit. This procedure was repeated 5 times per model, the models were interleaved with a cooldown pause to limit thermal effects, and the power was read every second. The results are stored in `reports/emissions/co2_runs.jsonl`.
 
 | Model | Energy (mWh, mean ± std) | Emissions (mg CO2eq, mean ± std) | Duration (s, mean) |
 |---|---:|---:|---:|
@@ -260,7 +260,7 @@ For a reliable comparison between models, a separate benchmark (`src/modeling/me
 | Logistic regression | 8.65 ± 2.06 | 1.51 ± 0.36 | 1.56 |
 | Random forest | 49.19 ± 17.83 | 8.56 ± 3.10 | 6.79 |
 
-Naive Bayes and linear SVM consumed a similar amount of energy, and the difference between them is smaller than their standard deviations. Naive Bayes was the most stable model across repetitions. Random forest consumed about seven times more energy than the other models without improving the macro F1 score. The benchmark figures cannot be compared directly with the final fit figures, because the benchmark includes the cross-validation folds and uses different hyperparameters and a different sampling interval. The measurements cover only the electricity of the training process and do not constitute a full life-cycle assessment.
+Naive Bayes and linear SVM consumed a similar amount of energy, and the difference between them is smaller than their standard deviations. Naive Bayes was the most stable model across repetitions. Random forest consumed about seven times more energy than Naive Bayes and linear SVM without improving the macro F1 score. The benchmark figures cannot be compared directly with the final fit figures, because the benchmark includes the cross-validation folds and uses different hyperparameters and a different sampling interval. The measurements cover only the electricity of the training process and do not constitute a full life-cycle assessment.
 
 ## Technical Specifications
 
