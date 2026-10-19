@@ -36,7 +36,7 @@ if not (MODEL_PATH.exists() and TEST_PATH.exists()):
 @pytest.fixture(scope="module")
 def model() -> Pipeline:
     """
-    Load the selected model artifact.
+    Load the model artifact named by the MODEL_NAME environment variable.
     """
     return joblib.load(MODEL_PATH)
 

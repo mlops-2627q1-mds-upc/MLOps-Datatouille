@@ -1,3 +1,7 @@
+"""
+Unit tests for the `get_classifier` function in `src.modeling.train`.
+"""
+
 from omegaconf import OmegaConf
 import optuna
 import pytest

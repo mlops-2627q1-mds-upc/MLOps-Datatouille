@@ -31,8 +31,9 @@
 * Type all params and returns. Enforced by `mypy` (config in `pyproject.toml`). Use Google-style docstrings with Args, Returns, Raises.
 * When reading a file: if typing or docstrings are missing, flag it. List file and function. Do not silently ignore.
 * Keep functions small and pure where possible. Separate I/O, preprocessing, training, inference.
-* Use repo-standard libs for logging, CLI, progress, paths, and env loading. Check imports in `src/` first.
+* Use repo-standard libs for progress, paths, and env loading. Check imports in `src/` first. Logging is the standard library `logging` module (`logger = logging.getLogger(__name__)`).
 * Follow lint config from `pyproject.toml`. Fix imports before push.
+* Install agent-side tools with `uv pip install` (faster than pip on this setup). The repo's dependency tool remains pip + `requirements.txt`; never migrate it to uv or pyproject dependencies.
 * Load secrets from `.env`. Never hardcode tokens, URIs, or passwords.
 
 ## MLOps rules

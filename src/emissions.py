@@ -4,11 +4,11 @@ Energy and CO2 tracking for pipeline stages, built on CodeCarbon.
 
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
+import logging
 from pathlib import Path
 from typing import Any
 
 from codecarbon import OfflineEmissionsTracker
-from loguru import logger
 import mlflow
 
 from src.config import (
@@ -20,6 +20,8 @@ from src.config import (
 )
 
 EMISSIONS_FILE = "emissions.csv"
+
+logger = logging.getLogger(__name__)
 
 # CodeCarbon CSV column -> name of the figure in summaries and MLflow metrics
 SUMMARY_COLUMNS = {
@@ -159,7 +161,10 @@ def track_emissions(
         tracker.stop()
         summary = emissions_summary(tracker)
         logger.info(
-            f"[{stage}] {summary['energy_consumed_kwh']:.3g} kWh, "
-            f"{summary['emissions_kg_co2eq']:.3g} kg CO2eq in {summary['duration_s']:.1f} s"
+            "[%s] %.3g kWh, %.3g kg CO2eq in %.1f s",
+            stage,
+            summary["energy_consumed_kwh"],
+            summary["emissions_kg_co2eq"],
+            summary["duration_s"],
         )
         _log_to_mlflow(metric_prefix or stage, summary)

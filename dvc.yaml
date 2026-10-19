@@ -35,7 +35,10 @@ stages:
     cmd: python -m src.data.gx_context_configuration
     deps:
       - ${data.clean}
+      - src/data/preprocess.py
       - src/data/gx_context_configuration.py
+    params:
+      - data.anonymize
     outs:
       - data/processed/gx_validation.json
 

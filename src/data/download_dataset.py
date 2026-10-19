@@ -8,15 +8,17 @@ Usage (from the root of the repo):
 """
 
 import argparse
+import logging
 from pathlib import Path
 
 from datasets import concatenate_datasets, load_dataset
-from loguru import logger
 
 from src.config import RAW_DATA_DIR
 
 DATASET_ID = "diegovelilla/email-classification-dataset"
 RAW_PATH = RAW_DATA_DIR / "raw.csv"
+
+logger = logging.getLogger(__name__)
 
 
 def download_dataset(
@@ -37,7 +39,7 @@ def download_dataset(
     dataset = concatenate_datasets(list(ds.values()))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset.to_csv(str(output_path))
-    logger.info(f"Saved raw dataset to: {output_path}")
+    logger.info("Saved raw dataset to: %s", output_path)
     return output_path
 
 

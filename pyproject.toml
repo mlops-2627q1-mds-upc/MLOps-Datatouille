@@ -3,11 +3,15 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "mlops-datatouille"
+name = "imap"
 version = "0.0.1"
-description = "Spam detection ML system with spam detection, summarization, and automated feedback loops."
+description = "IMAP: Intelligent Message Analysis Platform — spam detection ML component built and deployed with MLOps practices."
 authors = [
-  { name = "Carles Aguilera, Alex Bueno, Joel Delgado, Berta Torrents, Diego Velilla" },
+  { name = "Carles Aguilera" },
+  { name = "Alex Bueno" },
+  { name = "Joel Delgado" },
+  { name = "Berta Torrents" },
+  { name = "Diego Velilla" },
 ]
 license = { file = "LICENSE" }
 readme = "README.md"

@@ -1,10 +1,10 @@
-# Intelligent Message Analysis System
+# Intelligent Message Analysis Platform
 
 <a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
 </a>
 
-Intelligent message analysis system: end-to-end binary text classification (spam vs. not spam) with automated preprocessing, data validation, four different model searches, and experiment tracking. Orchestrated with DVC, validated with Great Expectations, tracked with MLflow (DagsHub), and monitored for CO2 with CodeCarbon.
+Intelligent message analysis platform: end-to-end binary text classification (spam vs. not spam) with automated preprocessing, data validation, four different model searches, and experiment tracking. Orchestrated with DVC, validated with Great Expectations, tracked with MLflow (DagsHub), and monitored for CO2 with CodeCarbon.
 
 ## Pipeline
 
@@ -18,7 +18,8 @@ download -> clean -> validate_processed -> split -> train -> evaluate -> select
 
 * `clean`: deduplication, contact anonymization (`xxemail`/`xxphone`), count features, text normalization.
 * `validate_processed`: Great Expectations checkpoint against the cleaned dataset (schema, nulls, ranges, label values); report in `data/processed/gx_validation.json`.
-* `train`/`evaluate`: per model (`logreg`, `naive_bayes`, `linear_svm`, `random_forest`) logs an MLflow child run per Optuna trial: hyperparameters, CV/test metrics, CO2, top-20 features, and split MD5 hashes. Experimental use groups them under a parent run (see `docs/docs/experiment-tracking.md`).
+* The contact-detail expectation of `validate_processed` assumes `data.anonymize: true`. With anonymization disabled, the stage fails by design, since raw contact details must not reach training.
+* `train`/`evaluate`: per model (`logreg`, `naive_bayes`, `linear_svm`, `random_forest`) logs an MLflow child run per Optuna trial: hyperparameters, CV/test metrics, CO2, top-20 features, and split MD5 hashes. Experimental use groups them under a parent run (see `docs/docs/experiment-tracking.md`). 
 * Outputs: `models/`, `reports/metrics/`, `reports/features/`, `reports/emissions/`, `reports/best_model.json`.
 
 ## Quickstart (setup & run)
@@ -35,7 +36,7 @@ dvc pull                                          # fetch versioned data/models
 dvc exp run -n <exp_name>                         # run the full pipeline as a tracked experiment
 ```
 
-Optional local MLflow server (instead of DagsHub):
+Deprecated local MLflow server (instead of DagsHub):
 
 ```bash
 MLFLOW_PORT=5050 docker compose --env-file infra/mlflow/env.example \
@@ -45,7 +46,7 @@ export MLFLOW_TRACKING_URI=http://localhost:5050
 
 ## `dvc repro` vs `dvc exp run`
 
-**Important:** to see how the whole pipeline works from start to finish — with experiment tracking — always run `dvc exp run`, **not** `dvc repro`. With `dvc repro` everything appears to log correctly, but the experiment cannot be reproduced later: there is no DVC snapshot of the workspace state to restore. Details in `EDN-007`.
+**Important:** run exploratory experiments with `dvc exp run`, **not** `dvc repro`. An uncommitted `dvc repro` run is logged to MLflow, but no DVC snapshot of its workspace state exists to restore it. Details in `EDN-007`.
 
 Both execute `dvc.yaml`, but they serve different purposes:
 
@@ -59,8 +60,8 @@ Both execute `dvc.yaml`, but they serve different purposes:
 Rules of thumb:
 
 * Use `dvc exp run -n <exp_name>` for every run of the pipeline that you want to keep: experimentation, hyperparameter searches, threshold changes, model comparisons. Push it with `dvc exp push origin <exp_name>` so teammates can pull it.
-* Use `dvc repro` only for quick local checks (e.g. verifying your code change didn't break a stage). Do not use it to run experiments or the full training pipeline.
-* Only runs launched through `dvc exp run` are fully reproducible: a manual `python -m src.modeling.train` gets logged to MLflow, but no DVC artifact records the workspace state.
+* Use `dvc repro` for quick local checks and to update the committed baseline: commit the resulting `dvc.lock` and run `dvc push`, so that `git checkout + dvc pull` correctly restores it.
+* Uncommitted runs are only restorable when launched through `dvc exp run`: a manual `python -m src.modeling.train` gets logged to MLflow, but no DVC artifact records the workspace state.
 
 Details on the MLflow run tree and experiment restore: see `docs/docs/experiment-tracking.md` and `EDN-007`.
 
@@ -81,7 +82,18 @@ done
 
 * `tests/unit/`: helper logic, FastAPI route schemas, CLI, cleaning/anonymization edges.
 * `tests/integration/`: preprocessing/large pipeline flows and Great Expectations configuration (GX config tests work from in-memory DataFrames; `test_processed_data` skips itself when `data/processed/clean.csv` is absent).
-* `tests/regression/`: `test_model.py` (accuracy >= 0.95; macro P/R/F1 >= baseline) and `test_robustness.py` (macro F1 >= 0.90 on perturbed splits, >= 90% prediction stability, spam-score invariance for ham/user messages).
+* tests/regression/: test_model.py (accuracy and macro precision, recall and F1 >= 0.95 on the test split) and test_robustness.py (invariance: macro F1 >= 0.90 on perturbed messages and >= 90% unchanged predictions; directional: appending a spam phrase to legitimate messages does not lower the spam score in >= 90% of cases).
+
+## CO2 experiment
+
+`src/modeling/measure_co2.py` measures the training energy of each model outside the DVC pipeline. It repeats 5-fold CV plus a final fit with fixed hyperparameters 5 times per model, interleaving the models and sampling power every 1 s, because one training lasts only a few seconds. Results are stored in `reports/emissions/co2_runs.jsonl`, together with the hardware that produced them.
+
+```bash
+python -m src.modeling.measure_co2 --train data/dataset/train.csv \
+    --out reports/emissions/co2_runs.jsonl --reps 5
+```
+
+The pipeline itself samples every 15 s, so per-trial emissions in MLflow rely on very few readings and are indicative only.
 
 ## Quality checks (same as CI)
 

@@ -1,3 +1,8 @@
+"""
+Unit tests for the functions in `src.modeling.measure_co2` that collect hardware
+specs and select default classifiers.
+"""
+
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB

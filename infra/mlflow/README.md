@@ -9,7 +9,7 @@ Requirements: Docker Desktop / Docker Engine with Compose v2 (`docker compose`).
 ## Quick start
 
 ```bash
-cd docker/mlflow
+cd infra/mlflow
 
 cp env.example .env
 
