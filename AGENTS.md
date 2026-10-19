@@ -1,4 +1,4 @@
-# AGENTS.md — MLOps Spam Classifier
+# AGENTS.md — Intelligent Message Analysis System
 
 ## Context
 * Binary text classification: spam vs. not spam.
@@ -28,11 +28,12 @@
 * Before PR: run the same lint and test commands that CI runs.
 
 ## Code rules
-* Type all params and returns. Use Google-style docstrings with Args, Returns, Raises.
+* Type all params and returns. Enforced by `mypy` (config in `pyproject.toml`). Use Google-style docstrings with Args, Returns, Raises.
 * When reading a file: if typing or docstrings are missing, flag it. List file and function. Do not silently ignore.
 * Keep functions small and pure where possible. Separate I/O, preprocessing, training, inference.
-* Use repo-standard libs for logging, CLI, progress, paths, and env loading. Check imports in `src/` first.
+* Use repo-standard libs for progress, paths, and env loading. Check imports in `src/` first. Logging is the standard library `logging` module (`logger = logging.getLogger(__name__)`).
 * Follow lint config from `pyproject.toml`. Fix imports before push.
+* Install agent-side tools with `uv pip install` (faster than pip on this setup). The repo's dependency tool remains pip + `requirements.txt`; never migrate it to uv or pyproject dependencies.
 * Load secrets from `.env`. Never hardcode tokens, URIs, or passwords.
 
 ## MLOps rules
@@ -43,9 +44,9 @@
 * Monitoring code must not import training code.
 
 ## Git rules — see CONTRIBUTING.md
-* GitHub Flow only. `main` is protected and deployable.
-* Branch from `main` per issue. Use repo branch pattern.
-* Commit in imperative style with issue reference. Squash-and-merge only.
+* Workflow is task -> dev -> main (see CONTRIBUTING.md, EDN-003): task branches squash-merge into `dev`; `dev` merge-commits into `main`. `main` and `dev` are protected.
+* Branch from `dev` per issue (task branches). `main` only receives PRs from `dev`. Use repo branch pattern.
+* Commit in imperative style with issue reference. Squash for task -> dev; merge commit for dev -> main.
 * Never commit or push. Only suggest a commit command. User runs it.
 
 ## Commit suggestion — required after code
@@ -59,7 +60,7 @@
 * Before code: read target module, its test, and all Sources of truth above. Check open issue ID.
 * Make minimal diffs. Do not refactor unrelated files.
 * Do not edit `.github/`, `infra/`, lint config, or DVC remote without explicit request.
-* After code: run lint + tests. If fail, fix and rerun. Report commands run and result.
+* After code: run lint + mypy + tests. If fail, fix and rerun. Report commands run and result.
 * After finish: suggest a clean-context review via subagent. Do not auto-run. Provide copy prompt.
 * If blocked: stop, state missing input, list options. Do not guess schema or params.
 

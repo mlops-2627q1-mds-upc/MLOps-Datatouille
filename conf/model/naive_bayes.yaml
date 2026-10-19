@@ -1,0 +1,6 @@
+name: naive_bayes
+search_space:
+  alpha:
+    low: 0.01
+    high: 10.0
+    log: true

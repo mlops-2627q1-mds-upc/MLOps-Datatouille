@@ -1,0 +1,63 @@
+# Great Expectations context for validating the cleaned dataset.
+config_version: 4.0
+
+config_variables_file_path: uncommitted/config_variables.yml
+
+plugins_directory: plugins/
+
+stores:
+  expectations_store:
+    class_name: ExpectationsStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: expectations/
+
+  validation_results_store:
+    class_name: ValidationResultsStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: uncommitted/validations/
+
+  checkpoint_store:
+    class_name: CheckpointStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      suppress_store_backend_id: true
+      base_directory: checkpoints/
+
+  validation_definition_store:
+    class_name: ValidationDefinitionStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: validation_definitions/
+
+expectations_store_name: expectations_store
+validation_results_store_name: validation_results_store
+checkpoint_store_name: checkpoint_store
+
+data_docs_sites:
+  local_site:
+    class_name: SiteBuilder
+    show_how_to_buttons: true
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: uncommitted/data_docs/local_site/
+    site_index_builder:
+      class_name: DefaultSiteIndexBuilder
+fluent_datasources:
+  processed_data:
+    type: pandas_filesystem
+    id: db249a91-6b05-4685-8f63-e53eb76d8903
+    assets:
+      clean_spam_dataset:
+        type: csv
+        id: e93f2db5-6e2a-426a-8f14-0fef2e2e5f86
+        batch_definitions:
+          full_csv:
+            id: 0f28a497-e55d-4649-a72b-25395957a175
+            partitioner:
+              regex: clean.csv$
+              param_names: []
+    base_directory: data/processed
+analytics_enabled:
+data_context_id: ecf40cab-cfab-4898-b4dc-eb219a9a1c25

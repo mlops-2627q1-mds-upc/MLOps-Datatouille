@@ -1,5 +1,14 @@
-# Data
-/data/
+# Data file contents are versioned with DVC (see *.dvc and dvc.lock), never
+# with Git. Each data folder is ignored separately (not /data/ as a whole)
+# so that DVC pointer files (*.dvc) inside them stay committable.
+/data/raw/*
+/data/processed/*
+/data/dataset/*
+!/data/raw/*.dvc
+!/data/processed/*.dvc
+!/data/dataset/*.dvc
+!**/.gitignore
+!**/.gitkeep
 
 # Mac OS-specific storage files
 .DS_Store
@@ -13,7 +22,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*$py.class
+*$py.class  
 
 # C extensions
 *.so
@@ -189,3 +198,13 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# CodeCarbon: raw per-machine measurements
+reports/emissions/*.csv
+
+# MLflow: local tracking store (SQLite DB and run artifacts)
+mlflow.db
+mlruns/
+
+# UV
+uv.lock

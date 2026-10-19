@@ -1,0 +1,139 @@
+stages:
+  download:
+    cmd: >-
+      python -m src.data.download_dataset
+      --dataset-id ${data.hf_id}
+      --output ${data.raw}
+    deps:
+      - src/data/download_dataset.py
+    params:
+      - data.hf_id
+      - data.raw
+    outs:
+      - ${data.raw}
+
+  clean:
+    cmd: >-
+      python -m src.data.cleaning
+      --input ${data.raw}
+      --output ${data.clean}
+      --text-col ${data.text_col}
+      --label-col ${data.label_col}
+      --encoding ${data.encoding}
+      --emojis-as-text ${data.emojis_as_text}
+      --anonymize ${data.anonymize}
+    deps:
+      - ${data.raw}
+      - src/data/preprocess.py
+      - src/data/cleaning.py
+    params:
+      - data
+    outs:
+      - ${data.clean}
+
+  validate_processed:
+    cmd: python -m src.data.gx_context_configuration
+    deps:
+      - ${data.clean}
+      - src/data/preprocess.py
+      - src/data/gx_context_configuration.py
+    params:
+      - data.anonymize
+    outs:
+      - data/processed/gx_validation.json
+
+  split:
+    cmd: >-
+      python -m src.data.splitting
+      --input ${data.clean}
+      --train ${split.train}
+      --test ${split.test}
+      --label-col ${data.label_col}
+      --test-size ${split.test_size}
+      --random-state ${split.random_state}
+    deps:
+      - ${data.clean}
+      - data/processed/gx_validation.json
+      - src/data/split_data.py
+      - src/data/splitting.py
+    params:
+      - split
+      - data.label_col
+    outs:
+      - ${split.train}
+      - ${split.test}
+
+  train:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.train
+        model=${item}
+        data.train=${split.train}
+        data.label_col=${data.label_col}
+        train.max_features=${train.max_features}
+        train.cv_folds=${train.cv_folds}
+        train.random_state=${train.random_state}
+        train.n_trials=${train.n_trials}
+        model_out=models/${item}.joblib
+        metrics_out=reports/metrics/train/${item}.json
+      deps:
+        - ${split.train}
+        - src/data/preprocess.py
+        - src/config.py
+        - src/emissions.py
+        - src/modeling/train.py
+        - src/modeling/tracking.py
+        - conf/train.yaml
+        - conf/model/${item}.yaml
+      params:
+        - data.label_col
+        - train.max_features
+        - train.cv_folds
+        - train.random_state
+        - train.n_trials
+      outs:
+        - models/${item}.joblib
+      metrics:
+        - reports/metrics/train/${item}.json
+
+  evaluate:
+    foreach: ${train.models}
+    do:
+      cmd: >-
+        python -m src.modeling.evaluation
+        --model ${item}
+        --model-path models/${item}.joblib
+        --test ${split.test}
+        --metrics-out reports/metrics/test/${item}.json
+        --features-out reports/features/${item}.json
+        --label-col ${data.label_col}
+      deps:
+        - models/${item}.joblib
+        - ${split.test}
+        - src/modeling/train.py
+        - src/modeling/evaluation.py
+        - src/modeling/explain.py
+        - src/modeling/tracking.py
+      params:
+        - data.label_col
+      outs:
+        - reports/features/${item}.json
+      metrics:
+        - reports/metrics/test/${item}.json
+
+  select:
+    cmd: >-
+      python -m src.modeling.selection
+      --metric ${select.metric}
+      --metrics-dir reports/metrics/train
+      --models-dir models
+      --output reports/best_model.json
+    deps:
+      - reports/metrics/train
+      - src/modeling/selection.py
+    params:
+      - train.models
+      - select.metric
+    metrics:
+      - reports/best_model.json
