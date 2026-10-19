@@ -392,7 +392,7 @@ stages:
       isexec: true
     - path: models/logreg.joblib
       hash: md5
-      md5: 56340da425a0b3347b2f2278b1fe119b
+      md5: 51ef7044d109a485ded1f63c44703ad4
       size: 134593
       isexec: true
     - path: src/modeling/evaluation.py
@@ -412,8 +412,8 @@ stages:
       isexec: true
     - path: src/modeling/train.py
       hash: md5
-      md5: 19a6a25e091b4049846f0c94762d1ecc
-      size: 13042
+      md5: 8a197907d8c7ca79959a5469eb2e7b36
+      size: 12210
       isexec: true
     params:
       params.yaml:
@@ -442,7 +442,7 @@ stages:
       isexec: true
     - path: models/naive_bayes.joblib
       hash: md5
-      md5: 997dab790fe1f32e1c57659cf9b0d323
+      md5: b717f29bba260fff8a1f8b237b146705
       size: 206633
       isexec: true
     - path: src/modeling/evaluation.py
@@ -462,8 +462,8 @@ stages:
       isexec: true
     - path: src/modeling/train.py
       hash: md5
-      md5: 19a6a25e091b4049846f0c94762d1ecc
-      size: 13042
+      md5: 8a197907d8c7ca79959a5469eb2e7b36
+      size: 12210
       isexec: true
     params:
       params.yaml:
@@ -492,7 +492,7 @@ stages:
       isexec: true
     - path: models/linear_svm.joblib
       hash: md5
-      md5: 7871bfc91d23ba98ae1ac05eb56eeb4e
+      md5: d1c42f4d9b0c961838b94376ce43234f
       size: 134477
       isexec: true
     - path: src/modeling/evaluation.py
@@ -512,8 +512,8 @@ stages:
       isexec: true
     - path: src/modeling/train.py
       hash: md5
-      md5: 19a6a25e091b4049846f0c94762d1ecc
-      size: 13042
+      md5: 8a197907d8c7ca79959a5469eb2e7b36
+      size: 12210
       isexec: true
     params:
       params.yaml:
@@ -542,7 +542,7 @@ stages:
       isexec: true
     - path: models/random_forest.joblib
       hash: md5
-      md5: fbfe2b8a275840af90d0183b2ace8790
+      md5: 1c98c13f71447475db95918108c5f2a3
       size: 12472786
       isexec: true
     - path: src/modeling/evaluation.py
@@ -562,8 +562,8 @@ stages:
       isexec: true
     - path: src/modeling/train.py
       hash: md5
-      md5: 19a6a25e091b4049846f0c94762d1ecc
-      size: 13042
+      md5: 8a197907d8c7ca79959a5469eb2e7b36
+      size: 12210
       isexec: true
     params:
       params.yaml:
@@ -585,8 +585,8 @@ stages:
     deps:
     - path: reports/metrics/train
       hash: md5
-      md5: 162e82681d69e8b76c382be62a02ac9f.dir
-      size: 1238
+      md5: 78971d26421e9030ebdc3628e056130c.dir
+      size: 640
       nfiles: 5
     - path: src/modeling/selection.py
       hash: md5
