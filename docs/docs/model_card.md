@@ -1,7 +1,7 @@
 ---
 language:
   - en
-license: mit
+license: apache-2.0
 library_name: sklearn
 pipeline_tag: text-classification
 tags:
@@ -10,7 +10,6 @@ tags:
   - tf-idf
   - mlops
 datasets:
-  - Deysi/spam-detection-dataset
   - diegovelilla/email-classification-dataset
 metrics:
   - accuracy
@@ -24,7 +23,7 @@ co2_eq_emissions:
   geographical_location: Spain
   hardware_used: AMD Ryzen 7 4800H, 16 GB RAM
 model-index:
-  - name: datatouille-spam-classifier-naive-bayes
+  - name: message-classifier
     results:
       - task:
           type: text-classification
@@ -47,9 +46,9 @@ model-index:
             name: Macro F1
 ---
 
-# Model Card for the Datatouille Spam Classifier (Naive Bayes)
+# Model Card for the Message Classifier
 
-The Datatouille Spam Classifier is a supervised binary text classifier that labels an English message as `spam` or `not_spam`. It combines TF-IDF text features and seven message-level count features with a multinomial Naive Bayes classifier. It was selected among four candidate models because it obtained the highest cross-validation macro F1 score.
+The Message Classifier is a supervised binary text classifier that labels an English message as `spam` or `not_spam`. It combines TF-IDF text features and seven message-level count features with a multinomial Naive Bayes classifier. It was selected among four candidate models because it obtained the highest cross-validation macro F1 score.
 
 ## Model Details
 
@@ -64,7 +63,7 @@ The model is the spam detection component of a wider message-analysis system tha
 - **Shared by:** Team Datatouille, GitHub organization mlops-2627q1-mds-upc
 - **Model type:** Supervised binary text classifier (multinomial Naive Bayes on TF-IDF and count features)
 - **Language(s) (NLP):** English
-- **License:** MIT, as stated in the `LICENSE` file of the repository
+- **License:** Apache 2.0, as stated in the `LICENSE` file of the repository
 - **Finetuned from model:** Not applicable. The model is a classical machine learning classifier trained from scratch on the project data.
 
 ### Model Sources
@@ -289,7 +288,7 @@ The project is implemented in Python 3.12. The main libraries are scikit-learn 1
 
 ```bibtex
 @misc{datatouille2026spam,
-  title = {Datatouille Spam Classifier: Naive Bayes Model Card},
+  title = {Message Classifier Model Card},
   author = {Aguilera, Carles and Bueno, Alex and Delgado, Joel and Torrents, Berta and Velilla, Diego},
   year = {2026},
   howpublished = {GitHub repository},
@@ -300,7 +299,7 @@ The project is implemented in Python 3.12. The main libraries are scikit-learn 1
 
 **APA:**
 
-Aguilera, C., Bueno, A., Delgado, J., Torrents, B., & Velilla, D. (2026). *Datatouille spam classifier: Naive Bayes model card* [Machine learning model documentation]. GitHub. [https://github.com/mlops-2627q1-mds-upc/MLOps-Datatouille](https://github.com/mlops-2627q1-mds-upc/MLOps-Datatouille)
+Aguilera, C., Bueno, A., Delgado, J., Torrents, B., & Velilla, D. (2026). *Message Classifier Model Card* [Machine learning model documentation]. GitHub. [https://github.com/mlops-2627q1-mds-upc/MLOps-Datatouille](https://github.com/mlops-2627q1-mds-upc/MLOps-Datatouille)
 
 ## Glossary
 
