@@ -28,7 +28,7 @@
 * Before PR: run the same lint and test commands that CI runs.
 
 ## Code rules
-* Type all params and returns. Use Google-style docstrings with Args, Returns, Raises.
+* Type all params and returns. Enforced by `mypy` (config in `pyproject.toml`). Use Google-style docstrings with Args, Returns, Raises.
 * When reading a file: if typing or docstrings are missing, flag it. List file and function. Do not silently ignore.
 * Keep functions small and pure where possible. Separate I/O, preprocessing, training, inference.
 * Use repo-standard libs for logging, CLI, progress, paths, and env loading. Check imports in `src/` first.
@@ -59,7 +59,7 @@
 * Before code: read target module, its test, and all Sources of truth above. Check open issue ID.
 * Make minimal diffs. Do not refactor unrelated files.
 * Do not edit `.github/`, `infra/`, lint config, or DVC remote without explicit request.
-* After code: run lint + tests. If fail, fix and rerun. Report commands run and result.
+* After code: run lint + mypy + tests. If fail, fix and rerun. Report commands run and result.
 * After finish: suggest a clean-context review via subagent. Do not auto-run. Provide copy prompt.
 * If blocked: stop, state missing input, list options. Do not guess schema or params.
 

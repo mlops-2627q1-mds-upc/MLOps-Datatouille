@@ -87,8 +87,8 @@ git push -u origin <branch-name>
 ### Step 5: Automated CI Gate (`dev`) & Peer Review
 * **Automated Status Check:** GitHub Actions triggers the Fast Feedback & Code Integration job:
   - Enforces Ruff linting (`ruff check src tests`) and formatting (`ruff format --check src tests`) per `pyproject.toml`.
-  - Executes unit tests under tests/unit/ (FastAPI route schemas, helper logic).
-  - Executes lightweight Great Expectations schema checks on sample data.
+  - Enforces type checking (`mypy src` per `[tool.mypy]` in `pyproject.toml`).
+  - Executes hermetic unit and integration tests (`tests/unit/`, `tests/integration/`) with a coverage gate (`--cov-fail-under=80`). No DVC data needed: the data-dependent test skips itself when the data is not checked out.
 * **Peer Review:** Reviewers inspect the code diff and verify that logic and formatting standards are maintained.
 
 ### Step 6: Squash and Merge
@@ -110,6 +110,7 @@ When a sprint milestone is complete and integrated within dev, code is promoted 
 1. Open a Pull Request configuring: `base: main` $\leftarrow$ `compare: dev`
 2. **Automated CI Gate (`main`)**: GitHub Actions triggers the Comprehensive Pre-Production Validation job:
    - Source Verification: Fails immediately if the PR originates from any branch other than `dev`.
+   - Static Analysis Re-Run: Ruff linting/formatting and `mypy src` type checking run again, never trusting the green from the `dev` gate.
    - Full Data Pipeline Validation: Executes complete Great Expectations suites against the full dataset to prevent the data from schema corruption.
    - Automated Regression Testing: Runs tests/regression/ using Pytest to ensure model accuracy, classification boundaries, and confidence scores exceed our baselines.
    - Multi-Component Integration: Validates full integration of the spam classifier, the secondary text component (summarizer or multilabel classifier), and endpoints.
