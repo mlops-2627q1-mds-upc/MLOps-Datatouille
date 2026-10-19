@@ -1,4 +1,4 @@
-# Contributing Guidelines — Spam Detection ML System
+# Contributing Guidelines — Intelligent Message Analysis System
 Here you can find the documentation to maintain high code quality, system reproducibility, and good collaboration. All team members must follow this guide for every contribution.
 
 ---
@@ -127,7 +127,7 @@ When a sprint milestone is complete and integrated within dev, code is promoted 
 
 Follow these rules for all Python code in `src/`, `tests/`, and `notebooks/`.
 
-* Keep lines short (max 127 chars to pass CI, aim for ~99).
+* Keep lines short (max 99 chars: the ruff `line-length` in `pyproject.toml`).
 * Use blank lines to separate logic:
     * 2 blank lines around top-level functions and classes.
     * 1 blank line around methods inside a class.

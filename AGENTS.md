@@ -1,4 +1,4 @@
-# AGENTS.md — MLOps Spam Classifier
+# AGENTS.md — Intelligent Message Analysis System
 
 ## Context
 * Binary text classification: spam vs. not spam.
@@ -44,7 +44,7 @@
 
 ## Git rules — see CONTRIBUTING.md
 * GitHub Flow only. `main` is protected and deployable.
-* Branch from `main` per issue. Use repo branch pattern.
+* Branch from `dev` per issue (task branches). `main` only receives PRs from `dev`. Use repo branch pattern.
 * Commit in imperative style with issue reference. Squash-and-merge only.
 * Never commit or push. Only suggest a commit command. User runs it.
 
