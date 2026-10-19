@@ -39,8 +39,9 @@ jobs:
           mypy src
 
       - name: Run Unit and Integration Tests
+        # `test_processed_data` self-skips when DVC data is not checked out.
         run: |
-          pytest tests/unit tests/integration -v -k "not test_processed_data" --cov=src --cov-fail-under=80
+          pytest tests/unit tests/integration -v --cov=src --cov-fail-under=80
 
   # JOB 2: DEV -> MAIN
   comprehensive-validation:
@@ -70,6 +71,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest great_expectations fastapi httpx
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Static Code Analysis (Ruff)
+        run: |
+          ruff check src tests
+          ruff format --check src tests
 
       - name: Type Check (Mypy)
         run: |
