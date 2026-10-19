@@ -13,7 +13,6 @@ awscli
 codecarbon>=3.0
 datasets
 loguru
-mkdocs
 pip
 python-dotenv
 ruff==0.16.9

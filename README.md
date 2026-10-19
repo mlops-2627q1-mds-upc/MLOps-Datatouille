@@ -32,7 +32,7 @@ pip install -r requirements.txt                   # installs deps + `-e .`
 cp env.example .env                               # MLflow (DagsHub) tracking URI + credentials
 
 dvc pull                                          # fetch versioned data/models
-dvc repro                                         # run the full pipeline (or `dvc exp run`)
+dvc exp run -n <exp_name>                         # run the full pipeline as a tracked experiment
 ```
 
 Optional local MLflow server (instead of DagsHub):
@@ -42,6 +42,27 @@ MLFLOW_PORT=5050 docker compose --env-file infra/mlflow/env.example \
   -f infra/mlflow/docker-compose.yaml up -d
 export MLFLOW_TRACKING_URI=http://localhost:5050
 ```
+
+## `dvc repro` vs `dvc exp run`
+
+**Important:** to see how the whole pipeline works from start to finish — with experiment tracking — always run `dvc exp run`, **not** `dvc repro`. With `dvc repro` everything appears to log correctly, but the experiment cannot be reproduced later: there is no DVC snapshot of the workspace state to restore. Details in `EDN-007`.
+
+Both execute `dvc.yaml`, but they serve different purposes:
+
+| | `dvc exp run` | `dvc repro` |
+|---|---|---|
+| Purpose | Run the pipeline as a tracked experiment you can keep, compare, and restore | Rebuild pipeline outputs when code, data, or params change |
+| Git | Creates a Git ref snapshot of the workspace (commit + params) | Uses the committed code/lock as-is |
+| MLflow | Groups runs under a parent run tagged with the experiment name | Stands alone |
+| Restore | `dvc exp pull` + `dvc exp apply <exp_name>` restore the workspace state | `dvc pull` restores the current pipeline state |
+
+Rules of thumb:
+
+* Use `dvc exp run -n <exp_name>` for every run of the pipeline that you want to keep: experimentation, hyperparameter searches, threshold changes, model comparisons. Push it with `dvc exp push origin <exp_name>` so teammates can pull it.
+* Use `dvc repro` only for quick local checks (e.g. verifying your code change didn't break a stage). Do not use it to run experiments or the full training pipeline.
+* Only runs launched through `dvc exp run` are fully reproducible: a manual `python -m src.modeling.train` gets logged to MLflow, but no DVC artifact records the workspace state.
+
+Details on the MLflow run tree and experiment restore: see `docs/docs/experiment-tracking.md` and `EDN-007`.
 
 ## Tests
 

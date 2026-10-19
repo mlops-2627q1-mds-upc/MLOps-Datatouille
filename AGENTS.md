@@ -43,9 +43,9 @@
 * Monitoring code must not import training code.
 
 ## Git rules — see CONTRIBUTING.md
-* GitHub Flow only. `main` is protected and deployable.
+* Workflow is task -> dev -> main (see CONTRIBUTING.md, EDN-003): task branches squash-merge into `dev`; `dev` merge-commits into `main`. `main` and `dev` are protected.
 * Branch from `dev` per issue (task branches). `main` only receives PRs from `dev`. Use repo branch pattern.
-* Commit in imperative style with issue reference. Squash-and-merge only.
+* Commit in imperative style with issue reference. Squash for task -> dev; merge commit for dev -> main.
 * Never commit or push. Only suggest a commit command. User runs it.
 
 ## Commit suggestion — required after code

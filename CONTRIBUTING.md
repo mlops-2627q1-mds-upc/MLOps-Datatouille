@@ -91,10 +91,10 @@ git push -u origin <branch-name>
   - Executes hermetic unit and integration tests (`tests/unit/`, `tests/integration/`) with a coverage gate (`--cov-fail-under=80`). No DVC data needed: the data-dependent test skips itself when the data is not checked out.
 * **Peer Review:** Reviewers inspect the code diff and verify that logic and formatting standards are maintained.
 
-### Step 6: Squash and Merge
-Our repository is configured to strictly enforce **Squash and Merge**.
-* Once approved and all CI checks pass, click Squash and merge.
-* Ensure the final squashed commit message adheres to the 7 Git commit rules, summarizing the entire PR.
+### Step 6: Merge (Squash into `dev`, Merge Commit into `main`)
+* **Task -> `dev`**: click **Squash and merge**. Squashing keeps `dev` linear and makes each task a single revertable commit.
+* **`dev` -> `main`**: use a **regular merge commit** (not squash). Squashing `dev` into `main` would make the histories diverge, so future `dev -> main` PRs would re-show already-merged commits or conflict.
+* Ensure the final squashed commit message (task -> `dev`) adheres to the 7 Git commit rules, summarizing the entire PR.
 * Delete the feature branch after merging to keep the repository clean:
     ```bash
     git checkout dev
