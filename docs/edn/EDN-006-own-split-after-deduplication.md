@@ -26,4 +26,4 @@
 
 [ ] Other: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-**Other Evidence (optional):** `src/download_dataset.py` (joins the original splits), `src/data/cleaning.py` (deduplication), `src/data/split_data.py` and `src/data/splitting.py` (stratified split), the `split` section of `params.yaml`, and the `split` stage in `dvc.yaml`.
+**Other Evidence (optional):** `src/data/download_dataset.py` (joins the original splits), `src/data/cleaning.py` (deduplication), `src/data/split_data.py` and `src/data/splitting.py` (stratified split), the `split` section of `params.yaml`, and the `split` stage in `dvc.yaml`.

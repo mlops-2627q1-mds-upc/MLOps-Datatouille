@@ -1,4 +1,5 @@
-"""Generate a synthetic spam/not-spam dataset for developing models independently.
+"""
+Generate a synthetic spam/not-spam dataset for developing models independently.
 
 The dataset mimics a tabular feature matrix: one row per message, one column per
 engineered feature, and a binary target (1 = spam, 0 = ham). It is built with
@@ -41,7 +42,29 @@ def build_dataset(
     target_name: str,
     seed: int,
 ) -> pd.DataFrame:
-    """Build a DataFrame with ``n_samples`` rows, ``n_features`` + 1 columns."""
+    """
+    Build a synthetic dataset with a real, learnable spam/not-spam signal.
+
+    Args:
+        n_samples: Number of rows to generate.
+        n_features: Number of feature columns.
+        spam_fraction: Share of rows with the positive (spam) label.
+        n_informative: Number of informative features.
+        n_redundant: Number of redundant (linear combination) features.
+        n_repeated: Number of duplicated features.
+        n_clusters_per_class: Number of clusters per class.
+        class_sep: Separation between the two classes.
+        flip_y: Share of randomly flipped labels (label noise).
+        missing_rate: Fraction of feature cells set to NaN.
+        target_name: Name of the binary target column.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        DataFrame with ``n_features`` feature columns and the target column.
+
+    Raises:
+        ValueError: If the informative, redundant and repeated features exceed ``n_features``.
+    """
     used = n_informative + n_redundant + n_repeated
     if used > n_features:
         raise ValueError(
@@ -75,11 +98,27 @@ def build_dataset(
 
 
 def write_dataset(frame: pd.DataFrame, output_path: Path, float_format: str) -> None:
+    """
+    Write a dataset to CSV, creating the parent directory if needed.
+
+    Args:
+        frame: Dataset to write.
+        output_path: Destination CSV path.
+        float_format: Format string for floating-point columns.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output_path, index=False, float_format=float_format)
 
 
 def summarize(frame: pd.DataFrame, target_name: str, path: Path) -> None:
+    """
+    Log the shape, class balance and missing-value count of a dataset.
+
+    Args:
+        frame: Dataset to describe.
+        target_name: Name of the target column.
+        path: Path of the dataset, used in the log message.
+    """
     counts = frame[target_name].value_counts().sort_index()
     spam_share = counts.get(1, 0) / len(frame)
     logger.info(f"Wrote {path} ({path.stat().st_size / 1e6:.1f} MB)")
@@ -89,6 +128,12 @@ def summarize(frame: pd.DataFrame, target_name: str, path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parse the command-line arguments.
+
+    Returns:
+        Parsed arguments with the generation and output options.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Output CSV path")
     parser.add_argument("--target-name", default="target", help="Name of the binary target column")
@@ -114,6 +159,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Build the synthetic dataset, write it to CSV and log a summary."""
     args = parse_args()
 
     frame = build_dataset(

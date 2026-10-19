@@ -1,10 +1,14 @@
-"""Unit tests for the CO2 helpers in src/modeling/measure_co2.py."""
+"""
+Unit tests for the CO2 helpers in src/modeling/measure_co2.py.
+"""
 
 from src.modeling.measure_co2 import collect_hardware, summarize
 
 
 def _record(model: str, rep: int, emissions: float) -> dict:
-    """Build a minimal per-rep record for testing."""
+    """
+    Build a minimal per-rep record for testing.
+    """
     return {
         "model": model,
         "rep": rep,

@@ -25,7 +25,9 @@ def test_lower_case():
     ],
 )
 def test_remove_punctuation(text, expected):
-    """Test of removing punctuation while preserving the remaining content."""
+    """
+    Test of removing punctuation while preserving the remaining content.
+    """
     assert pp.remove_punctuation(text) == expected
 
 
@@ -48,7 +50,9 @@ def test_remove_numbers():
     ],
 )
 def test_remove_whitespace(text, expected):
-    """Test of trimming and collapsing whitespace, including tabs and newlines."""
+    """
+    Test of trimming and collapsing whitespace, including tabs and newlines.
+    """
     assert pp.remove_whitespace(text) == expected
 
 
@@ -66,7 +70,9 @@ def test_remove_html():
     ],
 )
 def test_replace_urls(text, expected):
-    """Test of replacing supported web links with the URL placeholder."""
+    """
+    Test of replacing supported web links with the URL placeholder.
+    """
     assert pp.remove_whitespace(pp.replace_urls(text)) == expected
 
 
@@ -83,7 +89,9 @@ def test_replace_urls(text, expected):
     ],
 )
 def test_replace_money(text, expected):
-    """Test of replacing currency formats without changing unrelated numbers."""
+    """
+    Test of replacing currency formats without changing unrelated numbers.
+    """
     assert pp.remove_whitespace(pp.replace_money(text)) == expected
 
 
@@ -141,7 +149,9 @@ def test_count_words():
     ],
 )
 def test_count_sentences(text, expected):
-    """Test of counting sentence fragments, including edge cases."""
+    """
+    Test of counting sentence fragments, including edge cases.
+    """
     assert pp.count_sentences(text) == expected
 
 
@@ -197,7 +207,9 @@ def test_clean_text_makes_near_duplicates_equal():
 
 
 def test_remove_duplicates(sample_df):
-    """Test of keeping the first duplicate row and resetting the index."""
+    """
+    Test of keeping the first duplicate row and resetting the index.
+    """
     result = pp.remove_duplicates(sample_df, "text")
     assert len(result) == len(sample_df) - 1
     assert result["text"].is_unique
@@ -205,7 +217,9 @@ def test_remove_duplicates(sample_df):
 
 
 def test_add_count_features(sample_df):
-    """Test of adding all count features without mutating the input DataFrame."""
+    """
+    Test of adding all count features without mutating the input DataFrame.
+    """
     result = pp.add_count_features(sample_df, "text")
     for col in pp.COUNT_FUNCTIONS:
         assert col in result.columns
@@ -215,7 +229,9 @@ def test_add_count_features(sample_df):
 
 
 def test_add_clean_text_and_second_dedup(sample_df):
-    """Test of cleaning text and removing duplicates created by normalization."""
+    """
+    Test of cleaning text and removing duplicates created by normalization.
+    """
     df = pp.remove_duplicates(sample_df, "text")
     df = pp.add_clean_text(df, "text")
     assert "clean_text" in df.columns

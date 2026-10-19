@@ -1,4 +1,6 @@
-"""Unit tests for email and phone-number anonymization."""
+"""
+Unit tests for email and phone-number anonymization.
+"""
 
 import pytest
 
@@ -15,7 +17,9 @@ from src.data import preprocess as pp
     ],
 )
 def test_anonymize_text_replaces_contact_details(text, expected):
-    """Test of replacing email addresses and phone numbers with placeholder tokens."""
+    """
+    Test of replacing email addresses and phone numbers with placeholder tokens.
+    """
     assert pp.remove_whitespace(pp.anonymize_text(text)) == expected
 
 
@@ -31,7 +35,9 @@ def test_anonymize_text_replaces_contact_details(text, expected):
     ],
 )
 def test_anonymize_text_keeps_numbers_that_are_not_international_phones(text):
-    """Test of leaving timestamps, IDs, dates, decimals, prices and local numbers unchanged."""
+    """
+    Test of leaving timestamps, IDs, dates, decimals, prices and local numbers unchanged.
+    """
     assert pp.anonymize_text(text) == text
 
 

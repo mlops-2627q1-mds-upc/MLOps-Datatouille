@@ -1,4 +1,4 @@
-**Engineering Decision Notebook (EDN) \- Entry Template** 
+**Engineering Decision Notebook (EDN) \- Entry** 
 
 **Milestone:** M1: Project Inception
 

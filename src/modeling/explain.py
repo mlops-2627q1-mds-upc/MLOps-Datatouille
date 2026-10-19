@@ -1,4 +1,6 @@
-"""Identification of the features that most influence the predictions of a trained model."""
+"""
+Identification of the features that most influence the predictions of a trained model.
+"""
 
 import numpy as np
 from sklearn.base import BaseEstimator
@@ -8,7 +10,8 @@ TOP_N = 20
 
 
 def classifier_scores(classifier: BaseEstimator) -> tuple[np.ndarray, str]:
-    """Return one influence score per input feature of a fitted classifier.
+    """
+    Return one influence score per input feature of a fitted classifier.
 
     Args:
         classifier: Fitted naive Bayes, linear (logistic regression, linear SVM), or tree
@@ -32,7 +35,8 @@ def classifier_scores(classifier: BaseEstimator) -> tuple[np.ndarray, str]:
 
 
 def top_features(pipeline: Pipeline, n: int = TOP_N) -> dict:
-    """List the ``n`` features with the largest absolute influence on a fitted pipeline.
+    """
+    List the ``n`` features with the largest absolute influence on a fitted pipeline.
 
     Args:
         pipeline: Fitted pipeline with a ``features`` step and a ``classifier`` step.

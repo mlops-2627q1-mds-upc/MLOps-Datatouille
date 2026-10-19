@@ -1,4 +1,6 @@
-"""Unit tests for the training stage (Optuna study and MLflow nesting)."""
+"""
+Unit tests for the training stage (Optuna study and MLflow nesting).
+"""
 
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -22,13 +24,17 @@ FAKE_RECORD = {"project_name": "fake", "duration": 2.0, "energy_consumed": 0.5, 
 
 @contextmanager
 def fake_track_emissions(*args: object, **kwargs: object) -> Iterator[SimpleNamespace]:
-    """Stand-in for ``track_emissions`` yielding a stopped tracker with a fixed measurement."""
+    """
+    Stand-in for ``track_emissions`` yielding a stopped tracker with a fixed measurement.
+    """
     yield SimpleNamespace(final_emissions_data=SimpleNamespace(values=dict(FAKE_RECORD)))
 
 
 @pytest.fixture
 def cfg() -> DictConfig:
-    """Small Hydra-like config tuning naive Bayes with a few trials."""
+    """
+    Small Hydra-like config tuning naive Bayes with a few trials.
+    """
     return OmegaConf.create(
         {
             "model": {
@@ -42,7 +48,9 @@ def cfg() -> DictConfig:
 
 @pytest.fixture
 def xy(monkeypatch: pytest.MonkeyPatch) -> tuple[pd.DataFrame, pd.Series]:
-    """Tiny dataset, with emissions tracking faked so tests stay fast and offline."""
+    """
+    Tiny dataset, with emissions tracking faked so tests stay fast and offline.
+    """
     monkeypatch.setattr(train, "track_emissions", fake_track_emissions)
     texts = ["win free prize now", "are we meeting today", "claim reward", "see you later"]
     labels = ["spam", "ham", "spam", "ham"]
@@ -59,14 +67,18 @@ def test_build_pipeline_ends_with_classifier() -> None:
 
 
 def test_save_metrics_writes_json(tmp_path: Path) -> None:
-    """Metrics are written as JSON, creating missing parent directories."""
+    """
+    Metrics are written as JSON, creating missing parent directories.
+    """
     path = tmp_path / "nested" / "metrics.json"
     train.save_metrics({"cv_f1_macro": 0.9}, path)
     assert json.loads(path.read_text()) == {"cv_f1_macro": 0.9}
 
 
 def test_run_study_is_deterministic(tracking_uri: str, cfg: DictConfig, xy: tuple) -> None:
-    """The seeded sampler gives the same best hyperparameters on every run."""
+    """
+    The seeded sampler gives the same best hyperparameters on every run.
+    """
     x, y = xy
     mlflow.set_experiment(EXPERIMENT)
     best_params = [train.run_study(cfg, x, y, ["n_words"]).best_params for _ in range(2)]
@@ -74,7 +86,9 @@ def test_run_study_is_deterministic(tracking_uri: str, cfg: DictConfig, xy: tupl
 
 
 def test_best_trial_keeps_all_cv_metrics(tracking_uri: str, cfg: DictConfig, xy: tuple) -> None:
-    """The best trial stores every CV metric, not only the tuned one."""
+    """
+    The best trial stores every CV metric, not only the tuned one.
+    """
     x, y = xy
     mlflow.set_experiment(EXPERIMENT)
     _, metrics, _ = train.train_and_evaluate(cfg, x, y, ["n_words"])
@@ -84,7 +98,9 @@ def test_best_trial_keeps_all_cv_metrics(tracking_uri: str, cfg: DictConfig, xy:
 def test_trials_nest_under_model_run(
     tracking_uri: str, cfg: DictConfig, xy: tuple, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Trial runs are children of the model run, which evaluation can still resume."""
+    """
+    Trial runs are children of the model run, which evaluation can still resume.
+    """
     monkeypatch.setenv("DVC_EXP_NAME", "my-exp")
     x, y = xy
     with start_model_run("naive_bayes", EXPERIMENT) as model_run:
@@ -104,7 +120,9 @@ def test_trials_nest_under_model_run(
 def test_emission_rows_cover_every_trial_and_final_fit(
     tracking_uri: str, cfg: DictConfig, xy: tuple
 ) -> None:
-    """Training returns one labelled measurement per trial plus one for the final fit."""
+    """
+    Training returns one labelled measurement per trial plus one for the final fit.
+    """
     mlflow.set_experiment(EXPERIMENT)
     x, y = xy
     _, _, rows = train.train_and_evaluate(cfg, x, y, ["n_words"])
@@ -116,7 +134,9 @@ def test_emission_rows_cover_every_trial_and_final_fit(
 def test_emission_metric_names_do_not_depend_on_model(
     tracking_uri: str, cfg: DictConfig, xy: tuple, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Emission metrics share names across models, so MLflow can plot them together."""
+    """
+    Emission metrics share names across models, so MLflow can plot them together.
+    """
     prefixes = []
 
     @contextmanager

@@ -1,4 +1,6 @@
-"""Integration tests for the text preprocessing workflow."""
+"""
+Integration tests for the text preprocessing workflow.
+"""
 
 import pandas as pd
 

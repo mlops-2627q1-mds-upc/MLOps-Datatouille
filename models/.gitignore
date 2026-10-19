@@ -1,4 +1,1 @@
-/logreg.joblib
-/naive_bayes.joblib
-/linear_svm.joblib
-/random_forest.joblib
+*.joblib
