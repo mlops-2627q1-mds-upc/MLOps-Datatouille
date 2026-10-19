@@ -123,7 +123,7 @@ CI runs the pipeline-level checks via `.github/workflows/ci-pipeline.yml`, with 
 │   ├── dataset/          <- Training and test splits
 │   ├── processed/        <- Cleaned dataset and its validation report
 │   └── raw/              <- Dataset as downloaded from Hugging Face
-├── docs/                 <- Documentation: dataset card and experiment tracking guide
+├── docs/                 <- Documentation: dataset and model card and experiment tracking guide
 │   ├── docs/
 │   ├── edn/              <- Engineering Decision Notebook entries
 │   └── proposals/        <- Design proposals of each component
