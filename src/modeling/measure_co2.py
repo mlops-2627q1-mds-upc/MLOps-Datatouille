@@ -146,11 +146,12 @@ def _ram_total_gb() -> float | None:
     Returns:
         Total physical memory in gigabytes, or None on unsupported platforms.
     """
+    sysconf = getattr(os, "sysconf", None)  # Not available on Windows
+    if sysconf is None:
+        return None
     try:
-        pages = os.sysconf("SC_PHYS_PAGES")
-        page_size = os.sysconf("SC_PAGE_SIZE")
-        return round(pages * page_size / 1e9, 2)
-    except (AttributeError, ValueError, OSError):
+        return round(sysconf("SC_PHYS_PAGES") * sysconf("SC_PAGE_SIZE") / 1e9, 2)
+    except (ValueError, OSError):
         return None
 
 
