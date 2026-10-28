@@ -14,6 +14,7 @@ codecarbon==3.3.1
 datasets==5.1.0
 fastapi==0.143.2
 httpx==0.28.1
+uvicorn[standard]==0.54.0
 pip
 python-dotenv==1.2.4
 ruff==0.16.9
