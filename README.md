@@ -84,6 +84,107 @@ done
 * `tests/integration/`: preprocessing/large pipeline flows and Great Expectations configuration (GX config tests work from in-memory DataFrames; `test_processed_data` skips itself when `data/processed/clean.csv` is absent).
 * tests/regression/: test_model.py (accuracy and macro precision, recall and F1 >= 0.95 on the test split) and test_robustness.py (invariance: macro F1 >= 0.90 on perturbed messages and >= 90% unchanged predictions; directional: appending a spam phrase to legitimate messages does not lower the spam score in >= 90% of cases).
 
+## API
+
+The spam classifier is served through a FastAPI application (`src/api/`). The API loads the model registered in the MLflow Model Registry under the alias `production` (`models:/spam-classifier@production`) once at startup, and does not start if the model cannot be loaded.
+
+### 1. Install the dependencies
+
+```bash
+python -m venv venv && source venv/bin/activate   # Python 3.10
+pip install -r requirements.txt                   # includes fastapi and uvicorn
+```
+
+### 2. Set the environment variables
+
+```bash
+cp env.example .env   # then fill in the DagsHub credentials
+```
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `MLFLOW_TRACKING_URI` | Yes | | MLflow server holding the Model Registry (DagsHub) |
+| `MLFLOW_TRACKING_USERNAME` | Yes | | DagsHub user |
+| `MLFLOW_TRACKING_PASSWORD` | Yes | | DagsHub token |
+| `MLFLOW_MODEL_NAME` | No | `spam-classifier` | Registered model served by the API |
+| `MLFLOW_MODEL_ALIAS` | No | `production` | Alias of the version to serve |
+| `PREDICTIONS_DB_PATH` | No | `data/api/predictions.db` | SQLite file of predictions and feedback (ignored by Git) |
+
+### 3. Register the model to serve
+
+The `select` stage writes the best model to `reports/best_model.json`. The following command logs that model to its MLflow run, registers it as a new version of `spam-classifier` and points the `production` alias to it. It only needs to be run when the served model changes.
+
+```bash
+dvc pull   # or dvc repro, so that models/ and reports/best_model.json exist
+python -m src.modeling.register --selection reports/best_model.json
+```
+
+### 4. Start the API
+
+```bash
+uvicorn src.api.api:app --reload                     # local development
+uvicorn src.api.api:app --host 0.0.0.0 --port 8080   # server (e.g. the FIB virtual machine)
+```
+
+The interactive documentation is available at `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc`.
+
+### 5. Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Welcome message, name and version of the API |
+| `GET` | `/health` | Service status and loaded model version |
+| `GET` | `/model` | Registered name, version, MLflow run and metrics of the production model |
+| `POST` | `/predict` | Classification of 1 to 100 messages as `spam` or `not_spam` |
+| `POST` | `/feedback` | Storage of the label that the user considers correct for a prediction |
+
+```bash
+curl http://localhost:8000/
+curl http://localhost:8000/health
+curl http://localhost:8000/model
+
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"texts": ["Congratulations! You won a FREE iPhone. Claim it at http://win.example",
+                 "Hi team, the meeting has been moved to 3pm."],
+       "threshold": 0.5}'
+
+curl -X POST http://localhost:8000/feedback \
+  -H "Content-Type: application/json" \
+  -d '{"prediction_id": 2, "corrected_label": "spam"}'
+```
+
+Example response of `/predict`:
+
+```json
+{
+  "model_name": "spam-classifier",
+  "model_version": "1",
+  "threshold": 0.5,
+  "predictions": [
+    {"prediction_id": 1, "label": "spam", "confidence": 0.99, "spam_probability": 0.99},
+    {"prediction_id": 2, "label": "not_spam", "confidence": 0.99, "spam_probability": 0.01}
+  ]
+}
+```
+
+* Each message must contain between 1 and 10,000 characters. Email addresses and international phone numbers are replaced with `xxemail` and `xxphone` before inference.
+* Every prediction is stored with the anonymized message, the model version and a UTC timestamp, for drift monitoring. The `prediction_id` of each result is the reference to correct it through `/feedback`. Each prediction accepts one correction.
+* `threshold` (optional, default 0.5) is the spam probability from which a message is labelled as spam. A higher threshold produces fewer false positives.
+* `confidence` is the probability of the returned label. `spam_probability` is the probability of spam, independent of the threshold.
+
+### Status codes
+
+| Code | Meaning |
+|---|---|
+| `200` / `201` | Success (`201` when feedback is stored) |
+| `400` | Invalid value detected while processing the request |
+| `404` | Feedback refers to a prediction that does not exist |
+| `409` | The prediction already has feedback |
+| `422` | Request does not match the schema (empty or too long message, unknown label, threshold outside [0, 1]) |
+| `500` | Unexpected error, logged on the server without exposing its details |
+| `503` | Model not loaded |
+
 ## CO2 experiment
 
 `src/modeling/measure_co2.py` measures the training energy of each model outside the DVC pipeline. It repeats 5-fold CV plus a final fit with fixed hyperparameters 5 times per model, interleaving the models and sampling power every 1 s, because one training lasts only a few seconds. Results are stored in `reports/emissions/co2_runs.jsonl`, together with the hardware that produced them.
@@ -137,7 +238,7 @@ CI runs the pipeline-level checks via `.github/workflows/ci-pipeline.yml`, with 
 │   └── metrics/          <- Training and test metrics of each model
 ├── scripts/              <- Helper scripts (e.g. synthetic data generation)
 ├── src/
-│   ├── api/              <- Web API for inference and feedback collection (Reserved for Milestone 4)
+│   ├── api/              <- Web API for inference and feedback collection
 │   ├── data/             <- Download, cleaning, validation, and splitting
 │   ├── modeling/         <- Training, evaluation, selection, explanation, and tracking
 │   ├── monitoring/       <- Data drift detection and performance monitoring (Reserved for Milestone 6)
