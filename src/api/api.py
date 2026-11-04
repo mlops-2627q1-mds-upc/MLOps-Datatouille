@@ -10,6 +10,10 @@ Run locally (from the root of the repo):
     uvicorn src.api.api:app --reload
 """
 
+import os
+from google import genai
+from google.genai import types
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import logging
@@ -235,33 +239,62 @@ def predict(
     store: PredictionStore = Depends(get_prediction_store),
 ) -> PredictionResponse:
     """
-    Classify one or several messages as `spam` or `not_spam`.
-
-    Email addresses and phone numbers are anonymized before inference. Each prediction gives
-    the predicted label, the probability of that label (`confidence`) and the probability of
-    spam. A message is labelled as spam when its spam probability is greater than or equal to
-    `threshold`. Predictions are returned in the order of `texts`.
-
-    Every prediction is stored with the anonymized message for monitoring. Its `prediction_id`
-    is the reference to send to `/feedback`.
+    Classify one or several messages as `spam` or `not_spam` and generate their summaries.
     """
+    # Classification SPAM / NOT SPAM.
     predictions = predict_messages(model.pipeline, payload.texts, payload.threshold)
     prediction_ids = store.add_predictions(
         predictions, payload.threshold, model.name, model.version
     )
-    return PredictionResponse(
-        model_name=model.name,
-        model_version=model.version,
-        threshold=payload.threshold,
-        predictions=[
+    
+    # Create/ prepare the Google Gemini client for text summarization.
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    config = types.GenerateContentConfig(
+        system_instruction=(
+            "You are an expert assistant specialized in text summarization. "
+            "Summarize the text in one or two short sentences of plain text. "
+            "CRITICAL: Do not use Markdown or any formatting: no asterisks, bullet points, "
+            "headings or line breaks. "
+            "CRITICAL: Always output the summary in the SAME language as the input text provided by the user."
+        ),
+        temperature=0.3,
+    )
+    
+    # Build the list of results by mapping predictions and their summaries
+    results = []
+    for prediction_id, prediction, original_text in zip(prediction_ids, predictions, payload.texts, strict=True):
+        
+        summary_text = None
+        
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.8-flash',
+                contents=f"Summarize the following text in one or two plain-text sentences:\n\n{original_text}",
+                config=config
+            )
+            summary_text = response.text
+        except Exception as e:
+
+            summary_text = f"Error generating summary: {str(e)}"
+
+
+        # Append the prediction result along with its summary to the results list
+        results.append(
             PredictionResult(
                 prediction_id=prediction_id,
                 label=prediction.label,
                 confidence=prediction.confidence,
                 spam_probability=prediction.spam_probability,
+                summary=summary_text
             )
-            for prediction_id, prediction in zip(prediction_ids, predictions, strict=True)
-        ],
+        )
+    
+    # The final response We will return.
+    return PredictionResponse(
+        model_name=model.name,
+        model_version=model.version,
+        threshold=payload.threshold,
+        predictions=results
     )
 
 
