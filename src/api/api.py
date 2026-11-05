@@ -10,16 +10,15 @@ Run locally (from the root of the repo):
     uvicorn src.api.api:app --reload
 """
 
-import os
-from google import genai
-from google.genai import types
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from google import genai
+from google.genai import types
 
 from src.api.model_loader import LoadedModel, ModelLoadError, load_production_model
 from src.api.prediction_store import (
@@ -246,7 +245,7 @@ def predict(
     prediction_ids = store.add_predictions(
         predictions, payload.threshold, model.name, model.version
     )
-    
+
     # Create/ prepare the Google Gemini client for text summarization.
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     config = types.GenerateContentConfig(
@@ -255,28 +254,31 @@ def predict(
             "Summarize the text in one or two short sentences of plain text. "
             "CRITICAL: Do not use Markdown or any formatting: no asterisks, bullet points, "
             "headings or line breaks. "
-            "CRITICAL: Always output the summary in the SAME language as the input text provided by the user."
+            "CRITICAL: Always output the summary in the SAME language as the input text "
+            "provided by the user."
         ),
         temperature=0.3,
     )
-    
+
     # Build the list of results by mapping predictions and their summaries
     results = []
-    for prediction_id, prediction, original_text in zip(prediction_ids, predictions, payload.texts, strict=True):
-        
+    for prediction_id, prediction, original_text in zip(
+        prediction_ids, predictions, payload.texts, strict=True
+    ):
         summary_text = None
-        
+
         try:
             response = client.models.generate_content(
-                model='gemini-3.8-flash',
-                contents=f"Summarize the following text in one or two plain-text sentences:\n\n{original_text}",
-                config=config
+                model="gemini-3.8-flash",
+                contents=(
+                    "Summarize the following text in one or two plain-text sentences:\n\n"
+                    f"{original_text}"
+                ),
+                config=config,
             )
             summary_text = response.text
         except Exception as e:
-
             summary_text = f"Error generating summary: {str(e)}"
-
 
         # Append the prediction result along with its summary to the results list
         results.append(
@@ -285,16 +287,16 @@ def predict(
                 label=prediction.label,
                 confidence=prediction.confidence,
                 spam_probability=prediction.spam_probability,
-                summary=summary_text
+                summary=summary_text,
             )
         )
-    
+
     # The final response We will return.
     return PredictionResponse(
         model_name=model.name,
         model_version=model.version,
         threshold=payload.threshold,
-        predictions=results
+        predictions=results,
     )
 
 
