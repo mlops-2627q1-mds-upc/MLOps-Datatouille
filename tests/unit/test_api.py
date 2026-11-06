@@ -1,14 +1,15 @@
 """
 Unit tests for the API endpoints, run through FastAPI's ``TestClient``.
 
-The production model is replaced by a small classifier trained in ``conftest.py``, so the tests
-need neither network access nor MLflow credentials. The prediction database is created in a
-temporary directory.
+The production model is replaced by a small classifier trained in ``conftest.py`` and Gemini
+is mocked, so the tests need neither network access nor credentials. The prediction database
+is created in a temporary directory.
 """
 
 from collections.abc import Iterator
 from pathlib import Path
 import sqlite3
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 import pytest
@@ -49,6 +50,9 @@ def client(spam_pipeline: Pipeline, db_path: Path) -> Iterator[TestClient]:
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(api, "load_production_model", lambda name, alias: loaded)
         patch.setattr(api, "PREDICTIONS_DB_PATH", db_path)
+        gemini = MagicMock()
+        gemini.models.generate_content.return_value.text = None
+        patch.setattr(api.genai, "Client", MagicMock(return_value=gemini))
         with TestClient(api.app, raise_server_exceptions=False) as test_client:
             yield test_client
 
@@ -102,6 +106,14 @@ def test_predict_single_message(client: TestClient) -> None:
     assert 0.0 <= result["confidence"] <= 1.0
     assert 0.0 <= result["spam_probability"] <= 1.0
     assert result["prediction_id"] >= 1
+
+
+def test_predict_uses_mocked_gemini(client: TestClient) -> None:
+    """Verify that prediction uses the simulated Gemini client."""
+    api.genai.Client.reset_mock()
+    predict(client, [SPAM_MESSAGE])
+    api.genai.Client.assert_called_once()
+    api.genai.Client.return_value.models.generate_content.assert_called_once()
 
 
 def test_predict_batch_keeps_order_and_labels_known_examples(client: TestClient) -> None:

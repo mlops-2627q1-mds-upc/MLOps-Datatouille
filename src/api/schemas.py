@@ -107,6 +107,10 @@ class PredictionResult(BaseModel):
     label: Label = Field(description="Predicted label.")
     confidence: float = Field(ge=0.0, le=1.0, description="Probability of the predicted label.")
     spam_probability: float = Field(ge=0.0, le=1.0, description="Probability of spam.")
+    summary: str | None = Field(
+        default=None,
+        description="Generated summary of the original message.",
+    )
 
 
 class PredictionResponse(BaseModel):
