@@ -246,8 +246,15 @@ def predict(
         predictions, payload.threshold, model.name, model.version
     )
 
-    # Create/ prepare the Google Gemini client for text summarization.
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    # Create/ prepare the Google Gemini client for text summarization. A missing key or any
+    # client error must not block the classification, so it only affects the summaries.
+    client = None
+    client_error = None
+    try:
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    except Exception as e:
+        logger.warning("Gemini client not available: %s", e)
+        client_error = f"Error generating summary: {str(e)}"
     config = types.GenerateContentConfig(
         system_instruction=(
             "You are an expert assistant specialized in text summarization. "
@@ -265,20 +272,21 @@ def predict(
     for prediction_id, prediction, original_text in zip(
         prediction_ids, predictions, payload.texts, strict=True
     ):
-        summary_text = None
+        summary_text = client_error
 
-        try:
-            response = client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=(
-                    "Summarize the following text in one or two plain-text sentences:\n\n"
-                    f"{original_text}"
-                ),
-                config=config,
-            )
-            summary_text = response.text
-        except Exception as e:
-            summary_text = f"Error generating summary: {str(e)}"
+        if client is not None:
+            try:
+                response = client.models.generate_content(
+                    model="gemini-3.8-flash",
+                    contents=(
+                        "Summarize the following text in one or two plain-text sentences:\n\n"
+                        f"{original_text}"
+                    ),
+                    config=config,
+                )
+                summary_text = response.text
+            except Exception as e:
+                summary_text = f"Error generating summary: {str(e)}"
 
         # Append the prediction result along with its summary to the results list
         results.append(
