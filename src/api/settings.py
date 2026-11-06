@@ -25,6 +25,7 @@ API_VERSION = "1.0.0"
 MAX_TEXT_LENGTH = 10_000  # Characters per message, far above a typical email body
 MAX_BATCH_SIZE = 100  # Messages per prediction request
 DEFAULT_SPAM_THRESHOLD = 0.5  # Spam probability from which a message is labelled as spam
+CLOUD_SUMMARIZATION_URL = os.getenv("CLOUD_SUMMARIZATION_URL")
 
 # Predictions served and feedback collected by the API (SQLite, never versioned with Git)
 PREDICTIONS_DB_PATH = Path(os.getenv("PREDICTIONS_DB_PATH") or DATA_DIR / "api" / "predictions.db")

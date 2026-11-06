@@ -12,6 +12,7 @@ import sqlite3
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
+import httpx
 import pytest
 from sklearn.pipeline import Pipeline
 
@@ -51,8 +52,15 @@ def client(spam_pipeline: Pipeline, db_path: Path) -> Iterator[TestClient]:
         patch.setattr(api, "load_production_model", lambda name, alias: loaded)
         patch.setattr(api, "PREDICTIONS_DB_PATH", db_path)
         gemini = MagicMock()
-        gemini.models.generate_content.return_value.text = None
+        gemini.models.generate_content.return_value.text = "Gemini summary"
         patch.setattr(api.genai, "Client", MagicMock(return_value=gemini))
+        patch.setattr(api, "CLOUD_SUMMARIZATION_URL", "https://cloud.example/summarize")
+        cloud_response = httpx.Response(
+            200,
+            json={"summary": "Cloud summary", "latency": 1.0},
+            request=httpx.Request("POST", "https://cloud.example/summarize"),
+        )
+        patch.setattr(api.httpx, "post", MagicMock(return_value=cloud_response))
         with TestClient(api.app, raise_server_exceptions=False) as test_client:
             yield test_client
 
@@ -114,6 +122,108 @@ def test_predict_uses_mocked_gemini(client: TestClient) -> None:
     predict(client, [SPAM_MESSAGE])
     api.genai.Client.assert_called_once()
     api.genai.Client.return_value.models.generate_content.assert_called_once()
+
+
+def test_predict_cloud_directly(client: TestClient) -> None:
+    """Cloud mode skips Gemini and sends the original message as JSON."""
+    api.genai.Client.reset_mock()
+    api.httpx.post.reset_mock()
+    response = client.post("/predict?cloud=true", json={"texts": [CONTACT_MESSAGE]})
+    assert response.status_code == 200
+    assert response.json()["predictions"][0]["summary"] == "Cloud summary"
+    api.genai.Client.assert_not_called()
+    api.httpx.post.assert_called_once_with(
+        "https://cloud.example/summarize",
+        json={"text": CONTACT_MESSAGE},
+        timeout=30.0,
+    )
+
+
+@pytest.mark.parametrize("code", [404, 503])
+def test_predict_falls_back_on_gemini_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    """Gemini API errors trigger the cloud fallback."""
+    gemini = api.genai.Client.return_value
+    monkeypatch.setattr(
+        gemini.models.generate_content,
+        "side_effect",
+        api.errors.APIError(code, {"error": {"code": code, "message": "unavailable"}}),
+    )
+    response = client.post("/predict", json={"texts": [SPAM_MESSAGE]})
+    assert response.status_code == 200
+    assert response.json()["predictions"][0]["summary"] == "Cloud summary"
+
+
+def test_predict_falls_back_on_empty_gemini(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty Gemini summary is retried using cloud."""
+    monkeypatch.setattr(
+        api.genai.Client.return_value.models.generate_content.return_value, "text", ""
+    )
+    response = client.post("/predict", json={"texts": [SPAM_MESSAGE]})
+    assert response.status_code == 200
+    assert response.json()["predictions"][0]["summary"] == "Cloud summary"
+
+
+def test_predict_falls_back_when_gemini_client_fails(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unavailable Gemini client does not prevent cloud summarization."""
+    monkeypatch.setattr(api.genai.Client, "side_effect", ValueError("missing key"))
+    response = client.post("/predict", json={"texts": [SPAM_MESSAGE]})
+    assert response.status_code == 200
+    assert response.json()["predictions"][0]["summary"] == "Cloud summary"
+
+
+@pytest.mark.parametrize("payload", [None, {}, {"summary": ""}, {"summary": 1}])
+def test_predict_handles_invalid_cloud_response(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, payload: object
+) -> None:
+    """An invalid cloud response leaves the prediction intact without a summary."""
+    response = httpx.Response(
+        200, json=payload, request=httpx.Request("POST", "https://cloud.example/summarize")
+    )
+    monkeypatch.setattr(api.httpx.post, "return_value", response)
+    result = client.post("/predict?cloud=true", json={"texts": [SPAM_MESSAGE]})
+    assert result.status_code == 200
+    assert result.json()["predictions"][0]["summary"] is None
+    assert result.json()["predictions"][0]["prediction_id"] >= 1
+
+
+def test_predict_handles_both_services_failing(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Failures in both summarizers are logged without losing the classification."""
+    monkeypatch.setattr(api.genai.Client, "side_effect", ValueError("missing key"))
+    monkeypatch.setattr(api.httpx.post, "side_effect", httpx.ConnectError("unavailable"))
+    response = client.post("/predict", json={"texts": [SPAM_MESSAGE]})
+    assert response.status_code == 200
+    assert response.json()["predictions"][0]["summary"] is None
+    assert "Gemini client unavailable" in caplog.text
+    assert "Cloud summarization request failed" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "cloud_response",
+    [
+        httpx.Response(503, request=httpx.Request("POST", "https://cloud.example/summarize")),
+        httpx.Response(
+            200,
+            content=b"not json",
+            request=httpx.Request("POST", "https://cloud.example/summarize"),
+        ),
+    ],
+)
+def test_predict_handles_cloud_http_and_json_errors(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, cloud_response: httpx.Response
+) -> None:
+    """Cloud HTTP failures and malformed JSON do not prevent classification."""
+    monkeypatch.setattr(api.httpx.post, "return_value", cloud_response)
+    response = client.post("/predict?cloud=true", json={"texts": [SPAM_MESSAGE]})
+    assert response.status_code == 200
+    assert response.json()["predictions"][0]["summary"] is None
 
 
 def test_predict_batch_keeps_order_and_labels_known_examples(client: TestClient) -> None:

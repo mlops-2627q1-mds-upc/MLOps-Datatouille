@@ -18,7 +18,8 @@ import os
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from google import genai
-from google.genai import types
+from google.genai import errors, types
+import httpx
 
 from src.api.model_loader import LoadedModel, ModelLoadError, load_production_model
 from src.api.prediction_store import (
@@ -39,6 +40,7 @@ from src.api.schemas import (
 from src.api.settings import (
     API_TITLE,
     API_VERSION,
+    CLOUD_SUMMARIZATION_URL,
     MLFLOW_MODEL_ALIAS,
     MLFLOW_MODEL_NAME,
     PREDICTIONS_DB_PATH,
@@ -231,14 +233,100 @@ def model_info(model: LoadedModel = Depends(get_model)) -> ModelInfoResponse:
     )
 
 
+def summarize_with_cloud(text: str) -> str | None:
+    """
+    Request a summary from the configured cloud service.
+
+    Args:
+        text: Original message to summarize.
+
+    Returns:
+        The summary, or None if the service fails or returns an invalid response.
+    """
+    if not CLOUD_SUMMARIZATION_URL:
+        logger.warning("Cloud summarization URL is not configured")
+        return None
+
+    try:
+        response = httpx.post(
+            CLOUD_SUMMARIZATION_URL,
+            json={"text": text},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except httpx.HTTPStatusError as error:
+        logger.warning("Cloud summarization failed with status %s", error.response.status_code)
+        return None
+    except httpx.RequestError as error:
+        logger.warning("Cloud summarization request failed: %s", type(error).__name__)
+        return None
+    except ValueError:
+        logger.warning("Cloud summarization returned invalid JSON")
+        return None
+
+    if not isinstance(data, dict):
+        logger.warning("Cloud summarization returned an invalid response")
+        return None
+    summary = data.get("summary")
+    if not isinstance(summary, str) or not summary.strip():
+        logger.warning("Cloud summarization returned an empty or invalid summary")
+        return None
+    return summary
+
+
+def summarize_with_gemini(
+    client: genai.Client, text: str, config: types.GenerateContentConfig
+) -> str | None:
+    """
+    Request a summary from Gemini.
+
+    Args:
+        client: Configured Gemini client.
+        text: Original message to summarize.
+        config: Gemini generation settings.
+
+    Returns:
+        The summary, or None if Gemini fails or returns no usable summary.
+    """
+    prompt = "Summarize the following text in one or two plain-text sentences:"
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=f"{prompt}\n\n{text}",
+            config=config,
+        )
+        summary = response.text
+    except errors.APIError as error:
+        logger.warning("Gemini summarization failed with status %s", error.code)
+        return None
+    except (httpx.RequestError, TimeoutError, ValueError) as error:
+        logger.warning("Gemini summarization failed: %s", type(error).__name__)
+        return None
+    if not isinstance(summary, str) or not summary.strip():
+        logger.warning("Gemini returned an empty or invalid summary")
+        return None
+    return summary
+
+
 @app.post("/predict", tags=["Prediction"], response_model=PredictionResponse)
 def predict(
     payload: PredictionRequest,
+    cloud: bool = False,
     model: LoadedModel = Depends(get_model),
     store: PredictionStore = Depends(get_prediction_store),
 ) -> PredictionResponse:
     """
     Classify one or several messages as `spam` or `not_spam` and generate their summaries.
+
+    Args:
+        payload: Messages and classification threshold.
+        cloud: Use the cloud summarizer directly instead of Gemini.
+        model: Loaded classifier.
+        store: Prediction storage.
+
+    Returns:
+        Predictions and their summaries.
     """
     # Classification SPAM / NOT SPAM.
     predictions = predict_messages(model.pipeline, payload.texts, payload.threshold)
@@ -246,15 +334,12 @@ def predict(
         predictions, payload.threshold, model.name, model.version
     )
 
-    # Create/ prepare the Google Gemini client for text summarization. A missing key or any
-    # client error must not block the classification, so it only affects the summaries.
     client = None
-    client_error = None
-    try:
-        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-    except Exception as e:
-        logger.warning("Gemini client not available: %s", e)
-        client_error = f"Error generating summary: {str(e)}"
+    if not cloud:
+        try:
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        except (ValueError, errors.APIError) as error:
+            logger.warning("Gemini client unavailable: %s", type(error).__name__)
     config = types.GenerateContentConfig(
         system_instruction=(
             "You are an expert assistant specialized in text summarization. "
@@ -272,21 +357,11 @@ def predict(
     for prediction_id, prediction, original_text in zip(
         prediction_ids, predictions, payload.texts, strict=True
     ):
-        summary_text = client_error
-
+        summary_text = None
         if client is not None:
-            try:
-                response = client.models.generate_content(
-                    model="gemini-3.8-flash",
-                    contents=(
-                        "Summarize the following text in one or two plain-text sentences:\n\n"
-                        f"{original_text}"
-                    ),
-                    config=config,
-                )
-                summary_text = response.text
-            except Exception as e:
-                summary_text = f"Error generating summary: {str(e)}"
+            summary_text = summarize_with_gemini(client, original_text, config)
+        if summary_text is None:
+            summary_text = summarize_with_cloud(original_text)
 
         # Append the prediction result along with its summary to the results list
         results.append(

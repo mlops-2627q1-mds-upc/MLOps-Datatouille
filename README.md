@@ -109,6 +109,8 @@ cp env.example .env   # then fill in the DagsHub credentials
 | `MLFLOW_MODEL_NAME` | No | `spam-classifier` | Registered model served by the API |
 | `MLFLOW_MODEL_ALIAS` | No | `production` | Alias of the version to serve |
 | `PREDICTIONS_DB_PATH` | No | `data/api/predictions.db` | SQLite file of predictions and feedback (ignored by Git) |
+| `GEMINI_API_KEY` | No | | Gemini API key for summaries |
+| `CLOUD_SUMMARIZATION_URL` | No | | Cloud summary endpoint, required for cloud mode or fallback |
 
 ### 3. Register the model to serve
 
@@ -172,6 +174,8 @@ Example response of `/predict`:
 * Every prediction is stored with the anonymized message, the model version and a UTC timestamp, for drift monitoring. The `prediction_id` of each result is the reference to correct it through `/feedback`. Each prediction accepts one correction.
 * `threshold` (optional, default 0.5) is the spam probability from which a message is labelled as spam. A higher threshold produces fewer false positives.
 * `confidence` is the probability of the returned label. `spam_probability` is the probability of spam, independent of the threshold.
+* `/predict` tries Gemini for each summary, then falls back to the configured cloud endpoint if Gemini fails or returns an empty summary. Use `/predict?cloud=true` to select cloud directly. If no summary is available, `summary` is `null` and the error is logged; classification is still returned.
+* The cloud endpoint receives each original message as JSON `{"text": "..."}` and must return JSON containing a nonempty `summary` string. Both Gemini and cloud receive the original text, including any personal data; anonymization applies to classification and stored predictions.
 
 ### Status codes
 
