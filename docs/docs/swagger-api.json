@@ -1,0 +1,670 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Datatouille — IMAP Spam Detection API",
+    "version": "1.0.0",
+    "description": "Public HTTP API for the Datatouille project. The service loads the production spam classifier from the MLflow Model Registry, classifies text messages, optionally requests summaries from Gemini or a configured cloud summarizer, and stores prediction records and user corrections.\n\n**Public deployment:** Render. **Source:** MLOps-Datatouille FastAPI implementation.\n\n**Important:** The current API implementation does not enforce request authentication. The SQLite prediction/feedback database on a Render free instance is ephemeral and must not be treated as durable storage. Do not submit sensitive text.\n\n**Documentation provenance:** This OpenAPI file is authored from the project source code. The live /openapi.json endpoint could not be retrieved for comparison at generation time. Examples contain illustrative model outputs, not confirmed live responses."
+  },
+  "servers": [
+    {
+      "url": "https://datatouille-api.onrender.com",
+      "description": "Public Render deployment"
+    }
+  ],
+  "tags": [
+    {
+      "name": "General",
+      "description": "API discovery and health."
+    },
+    {
+      "name": "Model",
+      "description": "Metadata for the MLflow model loaded in memory."
+    },
+    {
+      "name": "Prediction",
+      "description": "Spam classification with optional summarization."
+    },
+    {
+      "name": "Feedback",
+      "description": "Store a corrected label for a previous prediction."
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "operationId": "getRoot",
+        "summary": "API information",
+        "description": "Returns the API name, version, and a link to interactive documentation.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RootResponse"
+                },
+                "example": {
+                  "message": "Welcome to the IMAP Spam Detection API. See /docs for the documentation.",
+                  "name": "IMAP Spam Detection API",
+                  "version": "1.0.0"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "operationId": "getHealth",
+        "summary": "Check API and model readiness",
+        "description": "Reports whether the server responds and whether the production classifier is loaded. A successful health response does not by itself test Gemini summarization or persistent storage.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok",
+                  "model_loaded": true,
+                  "model_name": "spam-classifier",
+                  "model_version": "7"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model": {
+      "get": {
+        "tags": [
+          "Model"
+        ],
+        "operationId": "getModelInfo",
+        "summary": "Get production model metadata",
+        "description": "Returns the model registry name, resolved alias/version, MLflow run ID and recorded cross-validation/test metrics for the version loaded when the API started.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInfoResponse"
+                },
+                "example": {
+                  "name": "spam-classifier",
+                  "alias": "production",
+                  "version": "7",
+                  "run_id": "example-mlflow-run-id",
+                  "metrics": {
+                    "cv_f1_macro": 0.9978,
+                    "test_f1_macro": 0.9962
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The production model is not loaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Model not loaded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/predict": {
+      "post": {
+        "tags": [
+          "Prediction"
+        ],
+        "operationId": "predictMessages",
+        "summary": "Classify and summarize messages",
+        "description": "Accepts 1–100 text messages and returns classifications in their original order. Email addresses and phone numbers are anonymized for **classification and storage**. The original text is passed to the selected external summarizer.\n\nWith `cloud=false` (default), the service tries Google Gemini first. If Gemini does not yield a usable summary, it attempts the configured `CLOUD_SUMMARIZATION_URL` fallback. With `cloud=true`, it skips Gemini and invokes that cloud service directly. If no summarizer is available, `summary` is null; classification can still succeed.\n\nEach prediction is written to SQLite and receives a `prediction_id` for later `/feedback`.",
+        "parameters": [
+          {
+            "name": "cloud",
+            "in": "query",
+            "required": false,
+            "description": "If true, use the configured external cloud summarizer instead of Gemini. Without CLOUD_SUMMARIZATION_URL, summaries may be null.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Text messages to classify and optional spam probability threshold.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRequest"
+              },
+              "examples": {
+                "twoMessages": {
+                  "summary": "Classify a batch",
+                  "value": {
+                    "texts": [
+                      "Congratulations! You won a FREE iPhone. Claim it now!",
+                      "Hi team, the meeting is tomorrow at 10 AM."
+                    ],
+                    "threshold": 0.5
+                  }
+                },
+                "singleMessage": {
+                  "summary": "Classify one message",
+                  "value": {
+                    "texts": [
+                      "Please review the attached meeting notes."
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Predictions and optional generated summaries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                },
+                "example": {
+                  "model_name": "spam-classifier",
+                  "model_version": "7",
+                  "threshold": 0.5,
+                  "predictions": [
+                    {
+                      "prediction_id": 1,
+                      "label": "spam",
+                      "confidence": 0.98,
+                      "spam_probability": 0.98,
+                      "summary": "A message claims that the recipient has won a prize."
+                    },
+                    {
+                      "prediction_id": 2,
+                      "label": "not_spam",
+                      "confidence": 0.97,
+                      "spam_probability": 0.03,
+                      "summary": "The team meeting is scheduled for tomorrow."
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid values found while processing the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Invalid value"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or query parameters failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "detail": [
+                    {
+                      "loc": [
+                        "body",
+                        "texts"
+                      ],
+                      "msg": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Internal server error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The model or prediction database is not initialized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Model not loaded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feedback": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "operationId": "submitFeedback",
+        "summary": "Correct an earlier prediction",
+        "description": "Stores the corrected spam label for a `prediction_id` returned by `/predict`. Each prediction accepts at most one feedback record. Feedback is recorded in SQLite with a UTC timestamp.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              },
+              "example": {
+                "prediction_id": 1,
+                "corrected_label": "not_spam"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Feedback saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                },
+                "example": {
+                  "id": 1,
+                  "prediction_id": 1,
+                  "created_at": "2026-11-08T10:00:00Z",
+                  "predicted_label": "spam",
+                  "corrected_label": "not_spam",
+                  "model_version": "7",
+                  "message": "Feedback stored"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No prediction exists with the supplied ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Prediction 999 does not exist"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The prediction already has feedback.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Prediction 1 already has feedback"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or query parameters failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "detail": [
+                    {
+                      "loc": [
+                        "body",
+                        "texts"
+                      ],
+                      "msg": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Internal server error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The prediction store is not initialized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Prediction storage not ready"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RootResponse": {
+        "type": "object",
+        "description": "Welcome response.",
+        "required": [
+          "message",
+          "name",
+          "version"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "description": "Service and loaded-model status.",
+        "required": [
+          "status",
+          "model_loaded",
+          "model_name",
+          "model_version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "model_loaded": {
+            "type": "boolean"
+          },
+          "model_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "model_version": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ModelInfoResponse": {
+        "type": "object",
+        "description": "Loaded MLflow model and associated metrics.",
+        "required": [
+          "name",
+          "alias",
+          "version",
+          "run_id",
+          "metrics"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "MLflow registry name."
+          },
+          "alias": {
+            "type": "string",
+            "description": "Alias resolved at startup."
+          },
+          "version": {
+            "type": "string",
+            "description": "Registered model version."
+          },
+          "run_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source MLflow run ID."
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            },
+            "description": "Recorded CV and test metrics."
+          }
+        }
+      },
+      "PredictionRequest": {
+        "type": "object",
+        "description": "Batch of text messages and an optional spam threshold.",
+        "required": [
+          "texts"
+        ],
+        "properties": {
+          "texts": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "1–100 messages, each 1–10,000 characters and not only whitespace.",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 10000
+            }
+          },
+          "threshold": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.5,
+            "description": "Classify as spam when spam_probability >= threshold."
+          }
+        }
+      },
+      "PredictionResult": {
+        "type": "object",
+        "required": [
+          "prediction_id",
+          "label",
+          "confidence",
+          "spam_probability"
+        ],
+        "properties": {
+          "prediction_id": {
+            "type": "integer",
+            "description": "Use this ID when submitting feedback."
+          },
+          "label": {
+            "$ref": "#/components/schemas/SpamLabel"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Estimated probability of the predicted class."
+          },
+          "spam_probability": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Estimated probability of spam."
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true,
+            "description": "External summary of original text, or null if unavailable."
+          }
+        }
+      },
+      "PredictionResponse": {
+        "type": "object",
+        "required": [
+          "model_name",
+          "model_version",
+          "threshold",
+          "predictions"
+        ],
+        "properties": {
+          "model_name": {
+            "type": "string"
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "number",
+            "format": "double"
+          },
+          "predictions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PredictionResult"
+            }
+          }
+        }
+      },
+      "SpamLabel": {
+        "type": "string",
+        "enum": [
+          "spam",
+          "not_spam"
+        ]
+      },
+      "FeedbackRequest": {
+        "type": "object",
+        "required": [
+          "prediction_id",
+          "corrected_label"
+        ],
+        "properties": {
+          "prediction_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "ID returned in /predict response."
+          },
+          "corrected_label": {
+            "$ref": "#/components/schemas/SpamLabel"
+          }
+        }
+      },
+      "FeedbackResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "prediction_id",
+          "created_at",
+          "predicted_label",
+          "corrected_label",
+          "model_version",
+          "message"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "prediction_id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "predicted_label": {
+            "$ref": "#/components/schemas/SpamLabel"
+          },
+          "corrected_label": {
+            "$ref": "#/components/schemas/SpamLabel"
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    }
+  }
+}
