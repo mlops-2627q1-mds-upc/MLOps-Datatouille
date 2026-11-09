@@ -26,5 +26,10 @@ MAX_TEXT_LENGTH = 10_000  # Characters per message, far above a typical email bo
 MAX_BATCH_SIZE = 100  # Messages per prediction request
 DEFAULT_SPAM_THRESHOLD = 0.5  # Spam probability from which a message is labelled as spam
 
+# Summarization with Google Gemini (disabled when GEMINI_API_KEY is not set)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or None
+GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.8-flash"
+SUMMARY_TIMEOUT_SECONDS = 30.0  # Per Gemini request, so a slow answer cannot block a worker
+
 # Predictions served and feedback collected by the API (SQLite, never versioned with Git)
 PREDICTIONS_DB_PATH = Path(os.getenv("PREDICTIONS_DB_PATH") or DATA_DIR / "api" / "predictions.db")

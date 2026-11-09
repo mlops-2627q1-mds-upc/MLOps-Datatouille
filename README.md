@@ -109,6 +109,8 @@ cp env.example .env   # then fill in the DagsHub credentials
 | `MLFLOW_MODEL_NAME` | No | `spam-classifier` | Registered model served by the API |
 | `MLFLOW_MODEL_ALIAS` | No | `production` | Alias of the version to serve |
 | `PREDICTIONS_DB_PATH` | No | `data/api/predictions.db` | SQLite file of predictions and feedback (ignored by Git) |
+| `GEMINI_API_KEY` | No | | Google Gemini key for `/summarize`. Without it the API starts and `/summarize` answers `503` |
+| `GEMINI_MODEL` | No | `gemini-3.8-flash` | Gemini model used by `/summarize` |
 
 ### 3. Register the model to serve
 
@@ -136,6 +138,7 @@ The interactive documentation is available at `http://localhost:8000/docs` (Swag
 | `GET` | `/health` | Service status and loaded model version |
 | `GET` | `/model` | Registered name, version, MLflow run and metrics of the production model |
 | `POST` | `/predict` | Classification of 1 to 100 messages as `spam` or `not_spam` |
+| `POST` | `/summarize` | Summary of one message in one or two sentences (Google Gemini) |
 | `POST` | `/feedback` | Storage of the label that the user considers correct for a prediction |
 
 ```bash
@@ -148,6 +151,10 @@ curl -X POST http://localhost:8000/predict \
   -d '{"texts": ["Congratulations! You won a FREE iPhone. Claim it at http://win.example",
                  "Hi team, the meeting has been moved to 3pm."],
        "threshold": 0.5}'
+
+curl -X POST http://localhost:8000/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hi team, the meeting has been moved to 3pm. Write to ana@example.com"}'
 
 curl -X POST http://localhost:8000/feedback \
   -H "Content-Type: application/json" \
@@ -162,8 +169,8 @@ Example response of `/predict`:
   "model_version": "1",
   "threshold": 0.5,
   "predictions": [
-    {"prediction_id": 1, "label": "spam", "confidence": 0.99, "spam_probability": 0.99},
-    {"prediction_id": 2, "label": "not_spam", "confidence": 0.99, "spam_probability": 0.01}
+    {"prediction_id": 1, "label": "spam", "confidence": 0.99, "spam_probability": 0.99, "summary": null},
+    {"prediction_id": 2, "label": "not_spam", "confidence": 0.99, "spam_probability": 0.01, "summary": null}
   ]
 }
 ```
@@ -172,6 +179,8 @@ Example response of `/predict`:
 * Every prediction is stored with the anonymized message, the model version and a UTC timestamp, for drift monitoring. The `prediction_id` of each result is the reference to correct it through `/feedback`. Each prediction accepts one correction.
 * `threshold` (optional, default 0.5) is the spam probability from which a message is labelled as spam. A higher threshold produces fewer false positives.
 * `confidence` is the probability of the returned label. `spam_probability` is the probability of spam, independent of the threshold.
+* `summary` is deprecated and always `null`, kept for backward compatibility. Use `/summarize` instead.
+* `/summarize` anonymizes the message before sending it to Gemini, and stores neither the message nor the summary. Each request times out after 30 s.
 
 ### Status codes
 
@@ -183,7 +192,8 @@ Example response of `/predict`:
 | `409` | The prediction already has feedback |
 | `422` | Request does not match the schema (empty or too long message, unknown label, threshold outside [0, 1]) |
 | `500` | Unexpected error, logged on the server without exposing its details |
-| `503` | Model not loaded |
+| `502` | Gemini could not produce the summary (error or timeout), without exposing its details |
+| `503` | Model not loaded, or summarization not configured (`/summarize` without `GEMINI_API_KEY`) |
 
 ## CO2 experiment
 

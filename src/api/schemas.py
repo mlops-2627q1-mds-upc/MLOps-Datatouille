@@ -109,7 +109,8 @@ class PredictionResult(BaseModel):
     spam_probability: float = Field(ge=0.0, le=1.0, description="Probability of spam.")
     summary: str | None = Field(
         default=None,
-        description="Generated summary of the original message.",
+        deprecated="Always null. Use /summarize to summarize a message.",
+        description="Deprecated: always null. Kept so that existing clients do not break.",
     )
 
 
@@ -120,6 +121,31 @@ class PredictionResponse(BaseModel):
     model_version: str
     threshold: float
     predictions: list[PredictionResult]
+
+
+class SummaryRequest(BaseModel):
+    """Message to summarize."""
+
+    text: MessageText
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "text": (
+                        "Hi team, the project meeting has been moved to Monday at 10. Please "
+                        "bring the updated report and write to ana@example.com if you cannot come."
+                    )
+                }
+            ]
+        }
+    )
+
+
+class SummaryResponse(BaseModel):
+    """Summary of a message."""
+
+    summary: str = Field(description="One or two plain-text sentences.")
 
 
 class FeedbackRequest(BaseModel):

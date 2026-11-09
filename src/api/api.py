@@ -13,12 +13,9 @@ Run locally (from the root of the repo):
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import logging
-import os
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from google import genai
-from google.genai import types
 
 from src.api.model_loader import LoadedModel, ModelLoadError, load_production_model
 from src.api.prediction_store import (
@@ -35,14 +32,20 @@ from src.api.schemas import (
     PredictionResponse,
     PredictionResult,
     RootResponse,
+    SummaryRequest,
+    SummaryResponse,
 )
 from src.api.settings import (
     API_TITLE,
     API_VERSION,
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
     MLFLOW_MODEL_ALIAS,
     MLFLOW_MODEL_NAME,
     PREDICTIONS_DB_PATH,
+    SUMMARY_TIMEOUT_SECONDS,
 )
+from src.api.summarizer import Summarizer, SummaryUnavailableError, build_summarizer
 from src.modeling.predict import predict_messages
 
 logger = logging.getLogger(__name__)
@@ -52,6 +55,8 @@ Spam detection service of the Intelligent Message Analysis Platform (IMAP).
 
 * **Prediction**: classify one or several messages as `spam` or `not_spam`, with the
   probability of each label. Email addresses and phone numbers are anonymized before inference.
+* **Summary**: summarize a message in one or two sentences with Google Gemini. The message is
+  anonymized before it is sent.
 * **Feedback**: report the correct label of a prediction, to monitor and retrain the model.
 * **Model**: consult the version and the evaluation metrics of the model in production.
 """
@@ -60,6 +65,7 @@ TAGS_METADATA = [
     {"name": "General", "description": "Service information and health check."},
     {"name": "Model", "description": "Metadata of the model in production."},
     {"name": "Prediction", "description": "Spam classification of messages."},
+    {"name": "Summary", "description": "Summarization of messages with Google Gemini."},
     {"name": "Feedback", "description": "Collection of user corrections."},
 ]
 
@@ -67,7 +73,9 @@ TAGS_METADATA = [
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
-    Load the production model and prepare the prediction database before serving requests.
+    Load the production model, prepare the prediction database and create the summarizer.
+
+    A missing Gemini API key only disables ``/summarize``: it does not stop the startup.
 
     Args:
         app: The FastAPI application.
@@ -94,9 +102,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.prediction_store.initialize()
     logger.info("Prediction database ready at %s", PREDICTIONS_DB_PATH)
 
+    app.state.summarizer = build_summarizer(GEMINI_API_KEY, GEMINI_MODEL, SUMMARY_TIMEOUT_SECONDS)
+
     yield
 
     app.state.model = None
+    app.state.summarizer = None
 
 
 app = FastAPI(
@@ -187,6 +198,27 @@ def get_prediction_store(request: Request) -> PredictionStore:
     return store
 
 
+def get_summarizer(request: Request) -> Summarizer:
+    """
+    Return the summarizer created at startup.
+
+    Args:
+        request: The current request, which gives access to the application state.
+
+    Returns:
+        The summarizer.
+
+    Raises:
+        HTTPException: 503 if summarization is not configured.
+    """
+    summarizer = getattr(request.app.state, "summarizer", None)
+    if summarizer is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Summarizer not configured"
+        )
+    return summarizer
+
+
 @app.get("/", tags=["General"], response_model=RootResponse)
 def root() -> RootResponse:
     """Return a welcome message with the name and the version of the API."""
@@ -238,74 +270,63 @@ def predict(
     store: PredictionStore = Depends(get_prediction_store),
 ) -> PredictionResponse:
     """
-    Classify one or several messages as `spam` or `not_spam` and generate their summaries.
+    Classify one or several messages as `spam` or `not_spam`.
+
+    Email addresses and phone numbers are anonymized before inference. Each prediction gives
+    the predicted label, the probability of that label (`confidence`) and the probability of
+    spam. A message is labelled as spam when its spam probability is greater than or equal to
+    `threshold`. Predictions are returned in the order of `texts`.
+
+    Every prediction is stored with the anonymized message for monitoring. Its `prediction_id`
+    is the reference to send to `/feedback`. The `summary` field is deprecated and always null:
+    use `/summarize` instead.
     """
-    # Classification SPAM / NOT SPAM.
     predictions = predict_messages(model.pipeline, payload.texts, payload.threshold)
     prediction_ids = store.add_predictions(
         predictions, payload.threshold, model.name, model.version
     )
-
-    # Create/ prepare the Google Gemini client for text summarization. A missing key or any
-    # client error must not block the classification, so it only affects the summaries.
-    client = None
-    client_error = None
-    try:
-        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-    except Exception as e:
-        logger.warning("Gemini client not available: %s", e)
-        client_error = f"Error generating summary: {str(e)}"
-    config = types.GenerateContentConfig(
-        system_instruction=(
-            "You are an expert assistant specialized in text summarization. "
-            "Summarize the text in one or two short sentences of plain text. "
-            "CRITICAL: Do not use Markdown or any formatting: no asterisks, bullet points, "
-            "headings or line breaks. "
-            "CRITICAL: Always output the summary in the SAME language as the input text "
-            "provided by the user."
-        ),
-        temperature=0.3,
-    )
-
-    # Build the list of results by mapping predictions and their summaries
-    results = []
-    for prediction_id, prediction, original_text in zip(
-        prediction_ids, predictions, payload.texts, strict=True
-    ):
-        summary_text = client_error
-
-        if client is not None:
-            try:
-                response = client.models.generate_content(
-                    model="gemini-3.8-flash",
-                    contents=(
-                        "Summarize the following text in one or two plain-text sentences:\n\n"
-                        f"{original_text}"
-                    ),
-                    config=config,
-                )
-                summary_text = response.text
-            except Exception as e:
-                summary_text = f"Error generating summary: {str(e)}"
-
-        # Append the prediction result along with its summary to the results list
-        results.append(
+    return PredictionResponse(
+        model_name=model.name,
+        model_version=model.version,
+        threshold=payload.threshold,
+        predictions=[
             PredictionResult(
                 prediction_id=prediction_id,
                 label=prediction.label,
                 confidence=prediction.confidence,
                 spam_probability=prediction.spam_probability,
-                summary=summary_text,
             )
-        )
-
-    # The final response We will return.
-    return PredictionResponse(
-        model_name=model.name,
-        model_version=model.version,
-        threshold=payload.threshold,
-        predictions=results,
+            for prediction_id, prediction in zip(prediction_ids, predictions, strict=True)
+        ],
     )
+
+
+@app.post(
+    "/summarize",
+    tags=["Summary"],
+    response_model=SummaryResponse,
+    responses={
+        502: {"description": "Gemini could not produce the summary"},
+        503: {"description": "Summarization is not configured"},
+    },
+)
+def summarize(
+    payload: SummaryRequest, summarizer: Summarizer = Depends(get_summarizer)
+) -> SummaryResponse:
+    """
+    Summarize a message in one or two plain-text sentences, in the language of the message.
+
+    Email addresses and phone numbers are anonymized before the message is sent to Google
+    Gemini. The message and its summary are not stored.
+    """
+    try:
+        summary = summarizer.summarize(payload.text)
+    except SummaryUnavailableError as error:
+        logger.warning("Summary not available: %s", error)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Summary service unavailable"
+        ) from error
+    return SummaryResponse(summary=summary)
 
 
 @app.post(

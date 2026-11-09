@@ -1,9 +1,9 @@
 """
 Unit tests for the API endpoints, run through FastAPI's ``TestClient``.
 
-The production model is replaced by a small classifier trained in ``conftest.py`` and Gemini
-is mocked, so the tests need neither network access nor credentials. The prediction database
-is created in a temporary directory.
+The production model is replaced by a small classifier trained in ``conftest.py`` and the
+Gemini client of the summarizer is mocked, so the tests need neither network access nor
+credentials. The prediction database is created in a temporary directory.
 """
 
 from collections.abc import Iterator
@@ -18,11 +18,13 @@ from sklearn.pipeline import Pipeline
 from src.api import api
 from src.api.model_loader import LoadedModel, ModelLoadError
 from src.api.settings import API_VERSION, MAX_BATCH_SIZE, MAX_TEXT_LENGTH
+from src.api.summarizer import Summarizer
 
 SPAM_MESSAGE = "WIN a FREE prize now!!! Claim your cash reward at http://win.example"
 NOT_SPAM_MESSAGE = "Hi team, the project meeting has been moved to Monday at 10."
 CONTACT_MESSAGE = "Thanks for the update. Write to ana@example.com or call +34 612 345 678."
 TEST_MODEL_VERSION = "7"
+TEST_SUMMARY = "The meeting has been moved to Monday."
 
 
 @pytest.fixture(scope="module")
@@ -32,7 +34,20 @@ def db_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.fixture(scope="module")
-def client(spam_pipeline: Pipeline, db_path: Path) -> Iterator[TestClient]:
+def gemini() -> MagicMock:
+    """Mocked Gemini client of the summarizer, shared by the module."""
+    return MagicMock()
+
+
+@pytest.fixture(autouse=True)
+def reset_gemini(gemini: MagicMock) -> None:
+    """Reset the mocked Gemini client before each test, answering with ``TEST_SUMMARY``."""
+    gemini.reset_mock(return_value=True, side_effect=True)
+    gemini.models.generate_content.return_value.text = TEST_SUMMARY
+
+
+@pytest.fixture(scope="module")
+def client(spam_pipeline: Pipeline, db_path: Path, gemini: MagicMock) -> Iterator[TestClient]:
     """
     Test client with the lifespan run, serving the test classifier.
 
@@ -50,9 +65,8 @@ def client(spam_pipeline: Pipeline, db_path: Path) -> Iterator[TestClient]:
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(api, "load_production_model", lambda name, alias: loaded)
         patch.setattr(api, "PREDICTIONS_DB_PATH", db_path)
-        gemini = MagicMock()
-        gemini.models.generate_content.return_value.text = None
-        patch.setattr(api.genai, "Client", MagicMock(return_value=gemini))
+        summarizer = Summarizer(gemini, "test-model")
+        patch.setattr(api, "build_summarizer", lambda api_key, model, timeout: summarizer)
         with TestClient(api.app, raise_server_exceptions=False) as test_client:
             yield test_client
 
@@ -108,12 +122,58 @@ def test_predict_single_message(client: TestClient) -> None:
     assert result["prediction_id"] >= 1
 
 
-def test_predict_uses_mocked_gemini(client: TestClient) -> None:
-    """Verify that prediction uses the simulated Gemini client."""
-    api.genai.Client.reset_mock()
-    predict(client, [SPAM_MESSAGE])
-    api.genai.Client.assert_called_once()
-    api.genai.Client.return_value.models.generate_content.assert_called_once()
+def test_predict_returns_no_summary_and_does_not_call_gemini(
+    client: TestClient, gemini: MagicMock
+) -> None:
+    """Test of the deprecated summary field, always null, with no Gemini request."""
+    body = predict(client, [SPAM_MESSAGE, NOT_SPAM_MESSAGE])
+    assert all(result["summary"] is None for result in body["predictions"])
+    gemini.models.generate_content.assert_not_called()
+
+
+def test_summarize_returns_summary(client: TestClient) -> None:
+    """Test of a summary returned by the summarizer."""
+    response = client.post("/summarize", json={"text": NOT_SPAM_MESSAGE})
+    assert response.status_code == 200
+    assert response.json() == {"summary": TEST_SUMMARY}
+
+
+def test_summarize_sends_anonymized_message(client: TestClient, gemini: MagicMock) -> None:
+    """Test of the anonymization of contact details before the message is sent to Gemini."""
+    assert client.post("/summarize", json={"text": CONTACT_MESSAGE}).status_code == 200
+    contents = gemini.models.generate_content.call_args.kwargs["contents"]
+    assert "xxemail" in contents and "xxphone" in contents
+    assert "ana@example.com" not in contents and "612" not in contents
+
+
+def test_summarize_failure_returns_502_without_details(
+    client: TestClient, gemini: MagicMock
+) -> None:
+    """Test of the 502 response when Gemini fails, which hides the error from the client."""
+    gemini.models.generate_content.side_effect = RuntimeError("secret internal detail")
+    response = client.post("/summarize", json={"text": NOT_SPAM_MESSAGE})
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Summary service unavailable"}
+
+
+def test_summarize_returns_503_without_summarizer(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test of the 503 response when summarization is not configured."""
+    monkeypatch.setattr(api.app.state, "summarizer", None)
+    response = client.post("/summarize", json={"text": NOT_SPAM_MESSAGE})
+    assert response.status_code == 503
+    assert client.post("/predict", json={"texts": [NOT_SPAM_MESSAGE]}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{"text": ""}, {"text": "   "}, {"text": "a" * (MAX_TEXT_LENGTH + 1)}, {}],
+    ids=["empty", "blank", "too-long", "missing"],
+)
+def test_summarize_rejects_invalid_input(client: TestClient, payload: dict) -> None:
+    """Test of the 422 response for summary requests that do not match the schema."""
+    assert client.post("/summarize", json=payload).status_code == 422
 
 
 def test_predict_batch_keeps_order_and_labels_known_examples(client: TestClient) -> None:
