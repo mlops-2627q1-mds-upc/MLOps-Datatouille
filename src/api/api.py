@@ -41,10 +41,10 @@ from src.api.settings import (
     API_TITLE,
     API_VERSION,
     CLOUD_SUMMARIZATION_URL,
+    GEMINI_MODEL,
     MLFLOW_MODEL_ALIAS,
     MLFLOW_MODEL_NAME,
     PREDICTIONS_DB_PATH,
-    GEMINI_MODEL,
 )
 from src.modeling.predict import predict_messages
 
@@ -293,7 +293,7 @@ def summarize_with_gemini(
     prompt = "Summarize the following text in one or two plain-text sentences:"
     try:
         response = client.models.generate_content(
-            model="gemini-3.8-flash",
+            model=GEMINI_MODEL,
             contents=f"{prompt}\n\n{text}",
             config=config,
         )

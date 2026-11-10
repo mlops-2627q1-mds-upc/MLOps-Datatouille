@@ -1,10 +1,14 @@
 """Generate the OpenAPI specification from the FastAPI application."""
+
 import json
-import sys
 from pathlib import Path
+import sys
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+
 from src.api.api import app  # noqa: E402
+
 OUTPUT_PATH = PROJECT_ROOT / "docs" / "docs" / "swagger_api.json"
 PRODUCTION_URL = "https://datatouille-api.onrender.com"
 
@@ -26,6 +30,7 @@ def generate_openapi() -> None:
         encoding="utf-8",
     )
     print(f"OpenAPI specification generated: {OUTPUT_PATH}")
+
 
 if __name__ == "__main__":
     generate_openapi()
