@@ -189,6 +189,163 @@ Example response of `/predict`:
 | `500` | Unexpected error, logged on the server without exposing its details |
 | `503` | Model not loaded |
 
+
+## 6. Cloud Summarization Service (UPC Virtech and ngrok)
+
+The project includes an independent text summarization service deployed on a virtual machine provided by UPC Virtech. This service was developed to support remote inference using a locally hosted language model, allowing the main application and other team members to generate summaries without executing the model on their own machines.
+
+The service uses the `Falconsai/text_summarization` model, based on the T5 architecture, and performs inference on the virtual machine's CPU. The model and tokenizer are stored in the VM, while a FastAPI application handles incoming requests, executes the model and returns the generated summaries.
+
+The application runs through Uvicorn on port `8080`. Since the virtual machine does not directly expose the service through a public HTTPS domain, ngrok is used to establish a secure tunnel between the local FastAPI server and external clients.
+
+The request flow is:
+
+```text
+External Client
+      |
+      v
+ngrok Public HTTPS Endpoint
+      |
+      v
+UPC Virtech Virtual Machine
+      |
+      v
+FastAPI (127.0.0.1:8080)
+      |
+      v
+Local T5 Summarization Model
+      |
+      v
+JSON Response
+```
+
+### Service endpoints
+
+The summarization service exposes two endpoints:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/cloud/health` | Checks whether the service is available. |
+| `POST` | `/cloud/summarize` | Generates a summary of the submitted text and returns the inference latency. |
+
+The public service can be accessed through:
+
+**https://kangaroo-gloater-gag.ngrok-free.dev**
+
+A summarization request can be performed using:
+
+```bash
+curl -X POST \
+  "https://kangaroo-gloater-gag.ngrok-free.dev/cloud/summarize" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Machine learning models can help automate repetitive tasks and improve the efficiency of software development."
+  }'
+```
+
+The response contains the generated summary and the inference latency, reported through the `summary` and `latency_ms` fields.
+
+## 7. Public API Deployment (Render)
+
+The main Datatouille API is deployed on Render as a publicly accessible FastAPI web service. This deployment provides a centralized interface for spam detection, text summarization, model information and user feedback, allowing external applications to consume the system without running the classification model locally.
+
+Unlike the Virtech service, which is dedicated to summarization, the Render deployment hosts the main application and coordinates its interactions with the MLflow Model Registry, Google Gemini and the optional cloud summarization service.
+
+The public API is available at:
+
+**https://datatouille-api.onrender.com**
+
+The interactive Swagger documentation can be accessed at:
+
+**https://datatouille-api.onrender.com/docs**
+
+### Deployment configuration
+
+The service is connected to the project's GitHub repository and deployed using Render's Web Service functionality. The application uses Python `3.13.9`, configured through `.python-version`, while the dependencies required for inference are defined separately in `requirements-render.txt`.
+
+During the build process, Render installs the application dependencies using:
+
+```bash
+pip install -r requirements-render.txt
+```
+
+The FastAPI application is started with Uvicorn:
+
+```bash
+uvicorn src.api.api:app --host 0.0.0.0 --port $PORT
+```
+
+The server listens on the port assigned by Render, which manages the public HTTPS endpoint and the application deployment process. This removes the need to expose a local development server or maintain an external tunnel for the main API.
+
+### Model loading and inference
+
+At application startup, FastAPI connects to the MLflow Model Registry hosted on DagsHub. The registered spam classification model is identified using its model name and the `production` alias.
+
+Once the corresponding version has been resolved, the model is downloaded and loaded into memory. Subsequent prediction requests reuse the loaded model, avoiding the need to retrieve it from MLflow for every inference.
+
+When a client submits a request to `/predict`, the application preprocesses the input messages, performs spam classification and returns the predicted labels with their associated confidence scores.
+
+The same endpoint also supports text summarization. Google Gemini is used as the primary summarization backend, while the Virtech service can be used as an alternative when configured.
+
+If Gemini fails or returns an invalid summary, the application attempts to use the configured cloud summarization service. Clients can also explicitly request the cloud backend using `/predict?cloud=true`.
+
+When no summarization backend is available, the classification results can still be returned with a `null` summary.
+
+The application therefore separates the classification process from the summarization service, allowing the spam detection functionality to remain operational when an external summarization provider is unavailable.
+
+### Public access and API usage
+
+The Render deployment exposes the following endpoints:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Returns general information about the API. |
+| `GET` | `/health` | Reports the service status and loaded model version. |
+| `GET` | `/model` | Returns model metadata and evaluation metrics from MLflow. |
+| `POST` | `/predict` | Classifies messages and generates summaries. |
+| `POST` | `/feedback` | Records user corrections associated with previous predictions. |
+
+The service can be tested from any external client using its public URL:
+
+```bash
+curl https://datatouille-api.onrender.com/health
+```
+
+A prediction request can be submitted using:
+
+```bash
+curl -X POST \
+  "https://datatouille-api.onrender.com/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "texts": [
+      "Congratulations! You have won a free iPhone!",
+      "Hi, the project meeting is scheduled for tomorrow."
+    ],
+    "threshold": 0.5
+  }'
+```
+
+The response includes the predicted classification, confidence, spam probability, model version and generated summary when available. Each prediction also receives an identifier that can be used to submit feedback.
+
+### Environment configuration
+
+The deployment uses environment variables to configure its external integrations. These include the MLflow tracking URI, DagsHub authentication credentials, registered model name, production alias and Gemini API key.
+
+The optional Virtech integration is configured through `CLOUD_SUMMARIZATION_URL`.
+
+Sensitive values are managed through Render's environment configuration rather than being stored in the Git repository.
+
+### Storage and free-tier limitations
+
+The application currently uses SQLite to store predictions and user feedback. These records include anonymized messages, model predictions, timestamps and user corrections, providing information that can support future drift monitoring and model retraining.
+
+**Storage limitation:** The public API runs on Render's free instance type, which uses an ephemeral filesystem. As a result, predictions and feedback stored in SQLite are lost when the service restarts, redeploys or is suspended due to inactivity. Persistent storage requires an external database or a persistent disk available on a suitable paid instance.
+
+Render's free tier also suspends inactive services. When a new request arrives, the application must restart and reload the production model from MLflow, which can increase the response time of the first request.
+
+CPU and memory resources are limited, so this deployment is intended primarily for development, integration testing and demonstrations rather than workloads requiring guaranteed availability.
+
 ## CO2 experiment
 
 `src/modeling/measure_co2.py` measures the training energy of each model outside the DVC pipeline. It repeats 5-fold CV plus a final fit with fixed hyperparameters 5 times per model, interleaving the models and sampling power every 1 s, because one training lasts only a few seconds. Results are stored in `reports/emissions/co2_runs.jsonl`, together with the hardware that produced them.

@@ -44,6 +44,7 @@ from src.api.settings import (
     MLFLOW_MODEL_ALIAS,
     MLFLOW_MODEL_NAME,
     PREDICTIONS_DB_PATH,
+    GEMINI_MODEL,
 )
 from src.modeling.predict import predict_messages
 
@@ -349,7 +350,6 @@ def predict(
             "CRITICAL: Always output the summary in the SAME language as the input text "
             "provided by the user."
         ),
-        temperature=0.3,
     )
 
     # Build the list of results by mapping predictions and their summaries
