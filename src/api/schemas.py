@@ -11,7 +11,13 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
-from src.api.settings import DEFAULT_SPAM_THRESHOLD, MAX_BATCH_SIZE, MAX_TEXT_LENGTH
+from src.api.settings import (
+    API_TITLE,
+    API_VERSION,
+    DEFAULT_SPAM_THRESHOLD,
+    MAX_BATCH_SIZE,
+    MAX_TEXT_LENGTH,
+)
 from src.modeling.predict import Label
 
 
@@ -40,21 +46,54 @@ MessageText = Annotated[
 ]
 
 
+class ErrorResponse(BaseModel):
+    """Error returned by the API when a request cannot be served."""
+
+    detail: str = Field(description="Human-readable description of the error.")
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{"detail": "Model not loaded"}]})
+
+
 class RootResponse(BaseModel):
     """Welcome message of the API."""
 
-    message: str
-    name: str
-    version: str
+    message: str = Field(description="Welcome message with a pointer to the documentation.")
+    name: str = Field(description="Name of the API.")
+    version: str = Field(description="Version of the API.")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "message": f"Welcome to the {API_TITLE}. See /docs for the documentation.",
+                    "name": API_TITLE,
+                    "version": API_VERSION,
+                }
+            ]
+        }
+    )
 
 
 class HealthResponse(BaseModel):
     """Status of the service and of the loaded model."""
 
-    status: Literal["ok"]
-    model_loaded: bool
-    model_name: str | None
-    model_version: str | None
+    status: Literal["ok"] = Field(description="Always `ok` when the service answers.")
+    model_loaded: bool = Field(description="Whether predictions can be served.")
+    model_name: str | None = Field(description="Name of the loaded model, if any.")
+    model_version: str | None = Field(description="Version of the loaded model, if any.")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "status": "ok",
+                    "model_loaded": True,
+                    "model_name": "spam-classifier",
+                    "model_version": "1",
+                }
+            ]
+        }
+    )
 
 
 class ModelInfoResponse(BaseModel):
@@ -65,6 +104,20 @@ class ModelInfoResponse(BaseModel):
     version: str = Field(description="Registered model version.")
     run_id: str | None = Field(description="MLflow run that produced the model.")
     metrics: dict[str, float] = Field(description="Cross-validation and test metrics.")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "spam-classifier",
+                    "alias": "production",
+                    "version": "1",
+                    "run_id": "3f2b9c1d8e7a4b6c9d0e1f2a3b4c5d6e",
+                    "metrics": {"cv_f1_macro": 0.97, "test_f1_macro": 0.96},
+                }
+            ]
+        }
+    )
 
 
 class PredictionRequest(BaseModel):
@@ -116,10 +169,40 @@ class PredictionResult(BaseModel):
 class PredictionResponse(BaseModel):
     """Predictions for a batch of messages, in the order of the request."""
 
-    model_name: str
-    model_version: str
-    threshold: float
-    predictions: list[PredictionResult]
+    model_name: str = Field(description="Name of the model that made the predictions.")
+    model_version: str = Field(description="Version of the model that made the predictions.")
+    threshold: float = Field(description="Spam threshold applied to the batch.")
+    predictions: list[PredictionResult] = Field(
+        description="One result per message, in the order of the request."
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "model_name": "spam-classifier",
+                    "model_version": "1",
+                    "threshold": 0.5,
+                    "predictions": [
+                        {
+                            "prediction_id": 1,
+                            "label": "spam",
+                            "confidence": 0.98,
+                            "spam_probability": 0.98,
+                            "summary": "A message claims the recipient won a free phone.",
+                        },
+                        {
+                            "prediction_id": 2,
+                            "label": "not_spam",
+                            "confidence": 0.97,
+                            "spam_probability": 0.03,
+                            "summary": "The team meeting has been moved to 3pm.",
+                        },
+                    ],
+                }
+            ]
+        }
+    )
 
 
 class FeedbackRequest(BaseModel):
@@ -136,10 +219,26 @@ class FeedbackRequest(BaseModel):
 class FeedbackResponse(BaseModel):
     """Confirmation of a stored feedback entry."""
 
-    id: int
-    prediction_id: int
-    created_at: datetime
-    predicted_label: Label
-    corrected_label: Label
+    id: int = Field(description="Identifier of the stored feedback entry.")
+    prediction_id: int = Field(description="Prediction that the feedback corrects.")
+    created_at: datetime = Field(description="UTC timestamp of the feedback.")
+    predicted_label: Label = Field(description="Label returned by the model.")
+    corrected_label: Label = Field(description="Label that the user considers correct.")
     model_version: str = Field(description="Version of the model that made the prediction.")
-    message: str
+    message: str = Field(description="Confirmation message.")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": 1,
+                    "prediction_id": 1,
+                    "created_at": "2026-11-10T10:00:00+00:00",
+                    "predicted_label": "spam",
+                    "corrected_label": "not_spam",
+                    "model_version": "1",
+                    "message": "Feedback stored",
+                }
+            ]
+        }
+    )
