@@ -40,6 +40,18 @@ MessageText = Annotated[
 ]
 
 
+class SummaryResponse(BaseModel):
+    """Return of the Summari when is called"""
+
+    summary: str
+
+
+class SummaryRequest(BaseModel):
+    """The request of the summarization"""
+
+    text: MessageText
+
+
 class RootResponse(BaseModel):
     """Welcome message of the API."""
 
