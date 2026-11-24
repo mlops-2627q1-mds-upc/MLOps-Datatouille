@@ -16,6 +16,7 @@ import httpx
 import httpx2
 import pytest
 from sklearn.pipeline import Pipeline
+from sqlalchemy import create_engine
 
 from src.api import api
 from src.api.model_loader import LoadedModel, ModelLoadError
@@ -25,12 +26,15 @@ from src.api.settings import (
     MAX_BATCH_SIZE,
     MAX_TEXT_LENGTH,
 )
+from src.database.prediction_store import PostgresPredictionStore
 
 SPAM_MESSAGE = "WIN a FREE prize now!!! Claim your cash reward at http://win.example"
 NOT_SPAM_MESSAGE = "Hi team, the project meeting has been moved to Monday at 10."
 CONTACT_MESSAGE = "Thanks for the update. Write to ana@example.com or call +34 612 345 678."
 TEST_MODEL_VERSION = "7"
 CLOUD_URL = "https://cloud.example/summarize"
+ADMIN_KEY = "test-admin-key"
+ADMIN = {"X-API-Key": ADMIN_KEY}
 
 
 @pytest.fixture(scope="module")
@@ -57,11 +61,17 @@ def client(spam_pipeline: Pipeline, db_path: Path) -> Iterator[TestClient]:
     )
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(api, "load_production_model", lambda name, alias: loaded)
-        patch.setattr(api, "PREDICTIONS_DB_PATH", db_path)
+        # Same store as in production, on a temporary SQLite file instead of PostgreSQL
+        patch.setattr(
+            api,
+            "create_prediction_store",
+            lambda: PostgresPredictionStore(create_engine(f"sqlite:///{db_path}")),
+        )
         gemini = MagicMock()
         gemini.models.generate_content.return_value.text = "Gemini summary"
         patch.setattr(api.genai, "Client", MagicMock(return_value=gemini))
         patch.setattr(api, "CLOUD_SUMMARIZATION_URL", CLOUD_URL)
+        patch.setattr(api, "ADMIN_API_KEY", ADMIN_KEY)
         cloud_response = httpx.Response(
             200,
             json={"summary": "Cloud summary", "latency": 1.0},
@@ -84,6 +94,21 @@ def sent_to_gemini() -> str:
     generate_content = api.genai.Client.return_value.models.generate_content
     generate_content.assert_called_once()
     return generate_content.call_args.kwargs["contents"]
+
+
+@pytest.fixture
+def without_model(client: TestClient) -> Iterator[None]:
+    """
+    Remove the model and the prediction store from the application state during a test.
+
+    The previous values are restored by hand: ``monkeypatch.setattr`` on Starlette's ``State``
+    deletes the attributes on undo instead of restoring them.
+    """
+    state = api.app.state
+    saved = (state.model, state.prediction_store)
+    state.model, state.prediction_store = None, None
+    yield
+    state.model, state.prediction_store = saved
 
 
 def predict(client: TestClient, texts: list[str], **extra: object) -> dict:
@@ -488,12 +513,8 @@ def test_summarize_rejects_invalid_input(
     api.httpx.post.assert_not_called()
 
 
-def test_summarize_works_without_model(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_summarize_works_without_model(client: TestClient, without_model: None) -> None:
     """Summaries do not depend on the classifier or the prediction database."""
-    monkeypatch.setattr(api.app.state, "model", None)
-    monkeypatch.setattr(api.app.state, "prediction_store", None)
     response = client.post("/summarize", json={"text": NOT_SPAM_MESSAGE})
     assert response.status_code == 200
 
@@ -598,12 +619,8 @@ def test_unexpected_error_returns_500_without_details(
     assert response.json() == {"detail": "Internal server error"}
 
 
-def test_endpoints_return_503_without_model(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_endpoints_return_503_without_model(client: TestClient, without_model: None) -> None:
     """Test of the 503 response when the model and the database are not available."""
-    monkeypatch.setattr(api.app.state, "model", None)
-    monkeypatch.setattr(api.app.state, "prediction_store", None)
     assert client.post("/predict", json={"texts": ["hello"]}).status_code == 503
     assert client.get("/model").status_code == 503
     feedback = {"prediction_id": 1, "corrected_label": "spam"}
@@ -621,3 +638,131 @@ def test_startup_fails_when_model_cannot_be_loaded(monkeypatch: pytest.MonkeyPat
     with pytest.raises(ModelLoadError, match="registry unreachable"):
         with TestClient(api.app):
             pass
+
+
+# CRUD of the stored predictions and feedback
+
+PREDICTION_ROW = {
+    "text": "Write to ana@example.com",
+    "predicted_label": "not_spam",
+    "spam_probability": 0.1,
+    "threshold": 0.5,
+    "model_name": "manual",
+    "model_version": "1",
+}
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/predictions"),
+        ("GET", "/predictions/1"),
+        ("POST", "/predictions"),
+        ("PUT", "/predictions/1"),
+        ("DELETE", "/predictions/1"),
+        ("GET", "/feedback"),
+        ("GET", "/feedback/1"),
+        ("PUT", "/feedback/1"),
+        ("DELETE", "/feedback/1"),
+    ],
+)
+def test_crud_requires_admin_key(client: TestClient, method: str, path: str) -> None:
+    """Test of the 401 response of the CRUD endpoints without a valid X-API-Key header."""
+    assert client.request(method, path).status_code == 401
+    assert client.request(method, path, headers={"X-API-Key": "wrong"}).status_code == 401
+
+
+def test_crud_disabled_without_admin_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test of the 503 response of the CRUD endpoints when no admin key is configured."""
+    monkeypatch.setattr(api, "ADMIN_API_KEY", None)
+    assert client.get("/predictions", headers=ADMIN).status_code == 503
+
+
+def test_prediction_crud(client: TestClient) -> None:
+    """Test of creating, reading, listing, replacing and deleting a stored prediction."""
+    created = client.post("/predictions", json=PREDICTION_ROW, headers=ADMIN)
+    assert created.status_code == 201
+    row = created.json()
+    assert "xxemail" in row["text"] and "ana@example.com" not in row["text"]
+    path = f"/predictions/{row['id']}"
+
+    assert client.get(path, headers=ADMIN).json() == row
+    listed = client.get("/predictions", params={"limit": 500}, headers=ADMIN).json()
+    assert row["id"] in [item["id"] for item in listed]
+
+    replaced = client.put(
+        path, json={**PREDICTION_ROW, "predicted_label": "spam"}, headers=ADMIN
+    ).json()
+    assert replaced["predicted_label"] == "spam"
+    assert replaced["created_at"] == row["created_at"]
+
+    assert client.delete(path, headers=ADMIN).status_code == 204
+    assert client.get(path, headers=ADMIN).status_code == 404
+    assert client.delete(path, headers=ADMIN).status_code == 404
+    assert client.put(path, json=PREDICTION_ROW, headers=ADMIN).status_code == 404
+
+
+def test_prediction_crud_validates_body(client: TestClient) -> None:
+    """Test of the 422 response for an invalid prediction row."""
+    invalid = {**PREDICTION_ROW, "predicted_label": "maybe"}
+    assert client.post("/predictions", json=invalid, headers=ADMIN).status_code == 422
+
+
+def test_feedback_crud(client: TestClient) -> None:
+    """Test of reading, listing, updating and deleting a stored feedback entry."""
+    prediction_id = predict(client, [NOT_SPAM_MESSAGE])["predictions"][0]["prediction_id"]
+    created = client.post(
+        "/feedback", json={"prediction_id": prediction_id, "corrected_label": "spam"}
+    ).json()
+    path = f"/feedback/{created['id']}"
+
+    row = client.get(path, headers=ADMIN).json()
+    assert row["prediction_id"] == prediction_id and row["corrected_label"] == "spam"
+    listed = client.get("/feedback", params={"limit": 500}, headers=ADMIN).json()
+    assert created["id"] in [item["id"] for item in listed]
+
+    updated = client.put(path, json={"corrected_label": "not_spam"}, headers=ADMIN).json()
+    assert updated["corrected_label"] == "not_spam"
+
+    assert client.delete(path, headers=ADMIN).status_code == 204
+    assert client.get(path, headers=ADMIN).status_code == 404
+    # The prediction is kept and accepts a new correction
+    assert client.get(f"/predictions/{prediction_id}", headers=ADMIN).status_code == 200
+    again = {"prediction_id": prediction_id, "corrected_label": "spam"}
+    assert client.post("/feedback", json=again).status_code == 201
+
+
+def test_deleting_prediction_deletes_its_feedback(client: TestClient) -> None:
+    """Test of the cascade from a deleted prediction to its feedback."""
+    prediction_id = predict(client, [SPAM_MESSAGE])["predictions"][0]["prediction_id"]
+    feedback_id = client.post(
+        "/feedback", json={"prediction_id": prediction_id, "corrected_label": "spam"}
+    ).json()["id"]
+    assert client.delete(f"/predictions/{prediction_id}", headers=ADMIN).status_code == 204
+    assert client.get(f"/feedback/{feedback_id}", headers=ADMIN).status_code == 404
+
+
+def test_openapi_marks_only_admin_endpoints_with_the_api_key() -> None:
+    """Test of the X-API-Key security scheme declared on the administration endpoints only."""
+    schema = api.app.openapi()
+    scheme = schema["components"]["securitySchemes"]["AdminApiKey"]
+    assert scheme == {**scheme, "type": "apiKey", "in": "header", "name": "X-API-Key"}
+    secured = {
+        (method.upper(), path)
+        for path, operations in schema["paths"].items()
+        for method, operation in operations.items()
+        if operation.get("security") == [{"AdminApiKey": []}]
+    }
+    assert secured == {
+        ("GET", "/predictions"),
+        ("POST", "/predictions"),
+        ("GET", "/predictions/{prediction_id}"),
+        ("PUT", "/predictions/{prediction_id}"),
+        ("DELETE", "/predictions/{prediction_id}"),
+        ("GET", "/feedback"),
+        ("GET", "/feedback/{feedback_id}"),
+        ("PUT", "/feedback/{feedback_id}"),
+        ("DELETE", "/feedback/{feedback_id}"),
+    }

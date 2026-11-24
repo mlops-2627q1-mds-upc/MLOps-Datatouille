@@ -2,15 +2,11 @@
   "openapi": "3.1.0",
   "info": {
     "title": "IMAP Spam Detection API",
-    "description": "\nSpam detection and text summarization service of the Intelligent Message Analysis Platform (IMAP).\n\nThe API classifies batches of messages as `spam` or `not_spam`, returns classification\nprobabilities, provides information about the production model registered in MLflow and\naccepts feedback on individual predictions.\n\nFor each prediction, the application attempts to generate a short summary using Google\nGemini. If Gemini is unavailable or returns an unusable summary, it attempts the configured\ncloud summarization service. The query parameter `cloud=true` bypasses Gemini and selects\nthe cloud service directly. Classification can succeed even if summarization is unavailable;\nin that case `summary` is `null`.\n\n### Public deployment\n\nThe main API is publicly deployed at https://datatouille-api.onrender.com.\n\n### Security and privacy\n\n**Authentication is not enforced** by the current application. There is no application-level\nrate limiting. Avoid submitting sensitive or confidential information.\n\nEmail addresses and phone numbers are anonymized for classification and storage, but the\n**original unredacted message** is supplied to external summarization providers when summaries\nare requested. The public API should not be used for sensitive data without additional access\ncontrols and suitable data protection arrangements.\n\n### Storage and availability\n\nThe application stores predictions and feedback in SQLite for monitoring and future retraining.\nThe **Render free instance uses an ephemeral filesystem**, so this database is not durable:\ndata can be lost when the instance is restarted, redeployed or replaced. Use an external\ndatabase or a supported persistent disk if data retention is required.\n\nOn the free plan, the instance may also spin down when idle. A subsequent request can take\nlonger while FastAPI restarts and reloads the production model from MLflow.\n\nPrediction limits: 1 to 100 messages per request, each containing 1 to 10,000 characters and\nat least one non-whitespace character. The optional threshold is between 0.0 and 1.0\n(default 0.5).\n",
-    "version": "1.0.0"
+    "description": "\nSpam detection and text summarization service of the Intelligent Message Analysis Platform\n(IMAP).\n\n* **Prediction**: classify 1 to 100 messages as `spam` or `not_spam`, with the probability of\n  each label. Email addresses and phone numbers are anonymized before inference.\n* **Summary**: summarize messages with Google Gemini, with a cloud service as fallback, through\n  `/summarize` or `/predict?summary=true`.\n* **Feedback**: report the correct label of a prediction, to monitor and retrain the model.\n* **Model**: consult the version and the evaluation metrics of the model in production.\n* **Administration**: read, create, update and delete the stored predictions and feedback.\n\n### Storage\n\nEvery prediction is stored in a PostgreSQL database with the anonymized message, the model\nversion and a UTC timestamp. Each prediction accepts one feedback entry. The data supports drift\nmonitoring and model retraining, and is kept across restarts and redeployments of the API.\n\n### Authentication\n\nThe administration endpoints (tags *Admin: predictions* and *Admin: feedback*) require the\nheader `X-API-Key` with the key configured on the server in `ADMIN_API_KEY`. Use the\n**Authorize** button to send it with every request. A missing or wrong key returns `401`, and the\nendpoints return `503` when no key is configured. The other endpoints are public.\n\n### Privacy\n\nMessages are anonymized for classification and storage. When a summary is requested, Gemini\nreceives the anonymized message, while the cloud fallback service receives the **original**\nmessage. Do not submit sensitive or confidential information. There is no rate limiting.\n\n### Limits\n\nEach message has 1 to 10,000 characters, with at least one non-whitespace character. The\noptional `threshold` is between 0.0 and 1.0 (default 0.5).\n\n---\n\n*Version 1.1.0. Specification generated on 2026-11-24 21:48 UTC, commit `95fdaf9`.*\n",
+    "version": "1.1.0",
+    "x-last-updated": "2026-11-24T21:48:57+00:00",
+    "x-git-commit": "95fdaf9"
   },
-  "servers": [
-    {
-      "url": "https://datatouille-api.onrender.com",
-      "description": "Public API hosted on Render"
-    }
-  ],
   "paths": {
     "/": {
       "get": {
@@ -40,7 +36,7 @@
           "General"
         ],
         "summary": "Health",
-        "description": "Report whether the service is running and which model it serves.\n\nThe service is running whenever this endpoint answers. `model_loaded` tells whether\npredictions can be served.",
+        "description": "Report whether the service is running and which model it serves.\nThe service is running whenever this endpoint answers. `model_loaded` tells whether\npredictions can be served.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -62,7 +58,7 @@
           "Model"
         ],
         "summary": "Model Info",
-        "description": "Return the metadata of the model in production.\n\nThe response includes the registered name, alias and version of the model, the MLflow run\nthat produced it, and the cross-validation and test metrics recorded in that run.",
+        "description": "Return the metadata of the model in production.\nThe response includes the registered name, alias and version of the model, the MLflow run\nthat produced it, and the cross-validation and test metrics recorded in that run.",
         "operationId": "model_info_model_get",
         "responses": {
           "200": {
@@ -74,12 +70,6 @@
                 }
               }
             }
-          },
-          "503": {
-            "description": "Production model not loaded"
-          },
-          "500": {
-            "description": "Unexpected internal server error"
           }
         }
       }
@@ -90,8 +80,72 @@
           "Prediction"
         ],
         "summary": "Predict",
-        "description": "Classify between 1 and 100 messages and optionally summarize the original text.\n\nEach message contains 1 to 10,000 nonblank characters. The threshold is the minimum\nspam probability for the `spam` label and defaults to 0.5. The result order matches\nthe input order. `confidence` is the predicted label probability;\n`spam_probability` is the spam class probability regardless of the threshold.\n\n`cloud=false` (default) tries Gemini, then the configured cloud service if needed.\n`cloud=true` bypasses Gemini. Summarization failures do not prevent classification;\nthe result `summary` is then `null`. Summarization providers receive original text,\nnot anonymized input. The returned `prediction_id` can be sent to `/feedback`.",
+        "description": "Classify one or several messages as `spam` or `not_spam` and generate their summaries.\n\nArgs:\n    payload: Messages and classification threshold.\n    cloud: Use the cloud summarizer directly instead of Gemini.\n    model: Loaded classifier.\n    store: Prediction storage.\n\nReturns:\n    Predictions and their summaries.",
         "operationId": "predict_predict_post",
+        "parameters": [
+          {
+            "name": "cloud",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cloud"
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Summary"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/summarize": {
+      "post": {
+        "tags": [
+          "Summary"
+        ],
+        "summary": "Summary",
+        "description": "Summarize a message with Gemini, falling back to our cloud service.\n\nArgs:\n    payload: Message to summarize.\n    cloud: Use our cloud service directly instead of Gemini.\n\nReturns:\n    The generated summary.\n\nRaises:\n    HTTPException: If no service returns a summary (502).",
+        "operationId": "summary_summarize_post",
         "parameters": [
           {
             "name": "cloud",
@@ -109,50 +163,139 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PredictionRequest"
+                "$ref": "#/components/schemas/SummaryRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Predictions and optional summaries in the input order",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PredictionResponse"
-                },
-                "example": {
-                  "model_name": "spam-classifier",
-                  "model_version": "1",
-                  "threshold": 0.5,
-                  "predictions": [
-                    {
-                      "prediction_id": 1,
-                      "label": "spam",
-                      "confidence": 0.98,
-                      "spam_probability": 0.98,
-                      "summary": "A promotional message claims the recipient won a phone."
-                    },
-                    {
-                      "prediction_id": 2,
-                      "label": "not_spam",
-                      "confidence": 0.97,
-                      "spam_probability": 0.03
-                    }
-                  ]
+                  "$ref": "#/components/schemas/SummaryResponse"
                 }
               }
             }
           },
-          "400": {
-            "description": "Invalid value detected while processing a request"
+          "422": {
+            "description": "Empty Blank text or too long text"
           },
-          "500": {
-            "description": "Unexpected internal server error"
+          "502": {
+            "description": "Summary service Unavaiable"
+          }
+        }
+      }
+    },
+    "/feedback": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Feedback",
+        "description": "Store the label that the user considers correct for a prediction.\n\nThe prediction is identified by the `prediction_id` returned by `/predict`. Each prediction\naccepts one correction. The feedback is stored with a UTC timestamp and, together with the\nstored prediction, is used to monitor and retrain the model.",
+        "operationId": "feedback_feedback_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The prediction does not exist"
+          },
+          "409": {
+            "description": "The prediction already has feedback"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Admin: feedback"
+        ],
+        "summary": "List Feedback",
+        "description": "List the stored feedback, ordered by id. New feedback is created with POST /feedback.",
+        "operationId": "list_feedback_feedback_get",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of rows to return.",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of rows to return."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of rows to skip.",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of rows to skip."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeedbackRecordResponse"
+                  },
+                  "title": "Response List Feedback Feedback Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
           },
           "503": {
-            "description": "Production model or prediction storage is unavailable"
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
           },
           "422": {
             "description": "Validation Error",
@@ -167,104 +310,469 @@
         }
       }
     },
-    "/feedback": {
-      "post": {
+    "/predictions": {
+      "get": {
         "tags": [
-          "Feedback"
+          "Admin: predictions"
         ],
-        "summary": "Feedback",
-        "description": "Store the label that the user considers correct for a prediction.\n\nThe prediction is identified by the `prediction_id` returned by `/predict`. Each prediction\naccepts one correction. The feedback is stored with a UTC timestamp and, together with the\nstored prediction, is used to monitor and retrain the model.",
-        "operationId": "feedback_feedback_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeedbackRequest"
-              }
-            }
+        "summary": "List Predictions",
+        "description": "List the stored predictions, ordered by id.",
+        "operationId": "list_predictions_predictions_get",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of rows to return.",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of rows to return."
           },
-          "required": true
-        },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of rows to skip.",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of rows to skip."
+          }
+        ],
         "responses": {
-          "201": {
-            "description": "Feedback stored successfully",
+          "200": {
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FeedbackResponse"
-                },
-                "example": {
-                  "id": 1,
-                  "prediction_id": 1,
-                  "created_at": "2026-11-10T10:00:00+00:00",
-                  "predicted_label": "not_spam",
-                  "corrected_label": "spam",
-                  "model_version": "1",
-                  "message": "Feedback stored"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PredictionRecordResponse"
+                  },
+                  "title": "Response List Predictions Predictions Get"
                 }
               }
             }
           },
-          "404": {
-            "description": "The prediction does not exist"
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
           },
-          "409": {
-            "description": "The prediction already has feedback"
+          "503": {
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
           },
           "422": {
-            "description": "Invalid feedback payload (for example, an unsupported label)",
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                },
-                "examples": {
-                  "invalid_label": {
-                    "summary": "Unsupported corrected_label",
-                    "value": {
-                      "detail": [
-                        {
-                          "type": "literal_error",
-                          "loc": [
-                            "body",
-                            "corrected_label"
-                          ],
-                          "msg": "Input should be 'spam' or 'not_spam'",
-                          "input": "ham",
-                          "ctx": {
-                            "expected": "'spam' or 'not_spam'"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  "missing_prediction_id": {
-                    "summary": "Missing prediction_id",
-                    "value": {
-                      "detail": [
-                        {
-                          "type": "missing",
-                          "loc": [
-                            "body",
-                            "prediction_id"
-                          ],
-                          "msg": "Field required",
-                          "input": {
-                            "corrected_label": "spam"
-                          }
-                        }
-                      ]
-                    }
-                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin: predictions"
+        ],
+        "summary": "Create Prediction",
+        "description": "Store a prediction given all its columns. The message is anonymized before storage.",
+        "operationId": "create_prediction_predictions_post",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionRecordResponse"
                 }
               }
             }
           },
-          "500": {
-            "description": "Unexpected internal server error"
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
           },
           "503": {
-            "description": "Prediction storage is unavailable"
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/predictions/{prediction_id}": {
+      "get": {
+        "tags": [
+          "Admin: predictions"
+        ],
+        "summary": "Get Prediction",
+        "description": "Return one stored prediction.",
+        "operationId": "get_prediction_predictions__prediction_id__get",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prediction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Prediction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionRecordResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
+          },
+          "503": {
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
+          },
+          "404": {
+            "description": "The prediction does not exist"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin: predictions"
+        ],
+        "summary": "Update Prediction",
+        "description": "Replace all the columns of a stored prediction (except its id and creation time).",
+        "operationId": "update_prediction_predictions__prediction_id__put",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prediction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Prediction Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionRecordResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
+          },
+          "503": {
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
+          },
+          "404": {
+            "description": "The prediction does not exist"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin: predictions"
+        ],
+        "summary": "Delete Prediction",
+        "description": "Delete a stored prediction and its feedback.",
+        "operationId": "delete_prediction_predictions__prediction_id__delete",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prediction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Prediction Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
+          },
+          "503": {
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
+          },
+          "404": {
+            "description": "The prediction does not exist"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feedback/{feedback_id}": {
+      "get": {
+        "tags": [
+          "Admin: feedback"
+        ],
+        "summary": "Get Feedback",
+        "description": "Return one stored feedback entry.",
+        "operationId": "get_feedback_feedback__feedback_id__get",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feedback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Feedback Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackRecordResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
+          },
+          "503": {
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
+          },
+          "404": {
+            "description": "The feedback does not exist"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin: feedback"
+        ],
+        "summary": "Update Feedback",
+        "description": "Change the corrected label of a stored feedback entry.",
+        "operationId": "update_feedback_feedback__feedback_id__put",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feedback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Feedback Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackRecordResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
+          },
+          "503": {
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
+          },
+          "404": {
+            "description": "The feedback does not exist"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin: feedback"
+        ],
+        "summary": "Delete Feedback",
+        "description": "Delete a stored feedback entry. Its prediction is kept.",
+        "operationId": "delete_feedback_feedback__feedback_id__delete",
+        "security": [
+          {
+            "AdminApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feedback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Feedback Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Missing or invalid X-API-Key header"
+          },
+          "503": {
+            "description": "Admin endpoints disabled (ADMIN_API_KEY not set)"
+          },
+          "404": {
+            "description": "The feedback does not exist"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -272,6 +780,40 @@
   },
   "components": {
     "schemas": {
+      "FeedbackRecordResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "prediction_id": {
+            "type": "integer",
+            "title": "Prediction Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "corrected_label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Corrected Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "prediction_id",
+          "created_at",
+          "corrected_label"
+        ],
+        "title": "FeedbackRecordResponse",
+        "description": "Row of the feedback table."
+      },
       "FeedbackRequest": {
         "properties": {
           "prediction_id": {
@@ -357,6 +899,29 @@
         ],
         "title": "FeedbackResponse",
         "description": "Confirmation of a stored feedback entry."
+      },
+      "FeedbackUpdateRequest": {
+        "properties": {
+          "corrected_label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Corrected Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "corrected_label"
+        ],
+        "title": "FeedbackUpdateRequest",
+        "description": "New corrected label of a feedback entry.",
+        "examples": [
+          {
+            "corrected_label": "spam"
+          }
+        ]
       },
       "HTTPValidationError": {
         "properties": {
@@ -463,6 +1028,122 @@
         ],
         "title": "ModelInfoResponse",
         "description": "Metadata of the production model."
+      },
+      "PredictionRecordRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Text",
+            "description": "Message. It is anonymized before being stored."
+          },
+          "predicted_label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Predicted Label"
+          },
+          "spam_probability": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Spam Probability"
+          },
+          "threshold": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Threshold",
+            "default": 0.5
+          },
+          "model_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model Name"
+          },
+          "model_version": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "predicted_label",
+          "spam_probability",
+          "model_name",
+          "model_version"
+        ],
+        "title": "PredictionRecordRequest",
+        "description": "Columns of a stored prediction, to create it (POST) or replace it (PUT).",
+        "examples": [
+          {
+            "model_name": "spam-classifier",
+            "model_version": "1",
+            "predicted_label": "spam",
+            "spam_probability": 0.97,
+            "text": "WIN a FREE prize now!!!",
+            "threshold": 0.5
+          }
+        ]
+      },
+      "PredictionRecordResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "predicted_label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Predicted Label"
+          },
+          "spam_probability": {
+            "type": "number",
+            "title": "Spam Probability"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "text",
+          "predicted_label",
+          "spam_probability",
+          "threshold",
+          "model_name",
+          "model_version"
+        ],
+        "title": "PredictionRecordResponse",
+        "description": "Row of the predictions table."
       },
       "PredictionRequest": {
         "properties": {
@@ -613,6 +1294,37 @@
         "title": "RootResponse",
         "description": "Welcome message of the API."
       },
+      "SummaryRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Text",
+            "description": "Raw message to classify."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "SummaryRequest",
+        "description": "The request of the summarization"
+      },
+      "SummaryResponse": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "title": "SummaryResponse",
+        "description": "Return of the Summari when is called"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -653,6 +1365,14 @@
         ],
         "title": "ValidationError"
       }
+    },
+    "securitySchemes": {
+      "AdminApiKey": {
+        "type": "apiKey",
+        "description": "Key of the administration endpoints, configured on the server in ADMIN_API_KEY.",
+        "in": "header",
+        "name": "X-API-Key"
+      }
     }
   },
   "tags": [
@@ -671,6 +1391,28 @@
     {
       "name": "Feedback",
       "description": "Collection of user corrections."
+    },
+    {
+      "name": "Summary",
+      "description": "Text summarization service."
+    },
+    {
+      "name": "Admin: predictions",
+      "description": "CRUD of the stored predictions. Requires the `X-API-Key` header."
+    },
+    {
+      "name": "Admin: feedback",
+      "description": "CRUD of the stored feedback. Requires the `X-API-Key` header."
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://datatouille-api.onrender.com",
+      "description": "Production API hosted on Render"
+    },
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Local development server"
     }
   ]
 }

@@ -6,7 +6,7 @@ returns a 422 response describing the problem when the validation fails. The sch
 generate the interactive documentation at ``/docs`` and ``/redoc``, including the examples.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
@@ -155,3 +155,71 @@ class FeedbackResponse(BaseModel):
     corrected_label: Label
     model_version: str = Field(description="Version of the model that made the prediction.")
     message: str
+
+
+def as_utc(value: datetime) -> datetime:
+    """Mark as UTC a stored time read without time zone (they are always stored in UTC)."""
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+UtcDatetime = Annotated[datetime, AfterValidator(as_utc)]
+
+
+class PredictionRecordRequest(BaseModel):
+    """Columns of a stored prediction, to create it (POST) or replace it (PUT)."""
+
+    text: MessageText = Field(description="Message. It is anonymized before being stored.")
+    predicted_label: Label
+    spam_probability: float = Field(ge=0.0, le=1.0)
+    threshold: float = Field(default=DEFAULT_SPAM_THRESHOLD, ge=0.0, le=1.0)
+    model_name: str = Field(min_length=1)
+    model_version: str = Field(min_length=1)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "text": "WIN a FREE prize now!!!",
+                    "predicted_label": "spam",
+                    "spam_probability": 0.97,
+                    "threshold": 0.5,
+                    "model_name": "spam-classifier",
+                    "model_version": "1",
+                }
+            ]
+        }
+    )
+
+
+class PredictionRecordResponse(BaseModel):
+    """Row of the predictions table."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: int
+    created_at: UtcDatetime
+    text: str
+    predicted_label: Label
+    spam_probability: float
+    threshold: float
+    model_name: str
+    model_version: str
+
+
+class FeedbackUpdateRequest(BaseModel):
+    """New corrected label of a feedback entry."""
+
+    corrected_label: Label
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{"corrected_label": "spam"}]})
+
+
+class FeedbackRecordResponse(BaseModel):
+    """Row of the feedback table."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    prediction_id: int
+    created_at: UtcDatetime
+    corrected_label: Label
