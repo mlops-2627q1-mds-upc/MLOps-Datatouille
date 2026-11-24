@@ -1,0 +1,13 @@
+fastapi==0.143.2
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+google-genai==3.0.0
+mlflow==3.16.1
+scikit-learn==1.7.2
+numpy==2.2.6
+pandas==2.3.3
+joblib==1.5.2
+emoji==2.16.0
+nltk==3.9.2
+python-dotenv==1.2.4
+-e .

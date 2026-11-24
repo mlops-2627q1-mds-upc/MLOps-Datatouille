@@ -1,0 +1,676 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "IMAP Spam Detection API",
+    "description": "\nSpam detection and text summarization service of the Intelligent Message Analysis Platform (IMAP).\n\nThe API classifies batches of messages as `spam` or `not_spam`, returns classification\nprobabilities, provides information about the production model registered in MLflow and\naccepts feedback on individual predictions.\n\nFor each prediction, the application attempts to generate a short summary using Google\nGemini. If Gemini is unavailable or returns an unusable summary, it attempts the configured\ncloud summarization service. The query parameter `cloud=true` bypasses Gemini and selects\nthe cloud service directly. Classification can succeed even if summarization is unavailable;\nin that case `summary` is `null`.\n\n### Public deployment\n\nThe main API is publicly deployed at https://datatouille-api.onrender.com.\n\n### Security and privacy\n\n**Authentication is not enforced** by the current application. There is no application-level\nrate limiting. Avoid submitting sensitive or confidential information.\n\nEmail addresses and phone numbers are anonymized for classification and storage, but the\n**original unredacted message** is supplied to external summarization providers when summaries\nare requested. The public API should not be used for sensitive data without additional access\ncontrols and suitable data protection arrangements.\n\n### Storage and availability\n\nThe application stores predictions and feedback in SQLite for monitoring and future retraining.\nThe **Render free instance uses an ephemeral filesystem**, so this database is not durable:\ndata can be lost when the instance is restarted, redeployed or replaced. Use an external\ndatabase or a supported persistent disk if data retention is required.\n\nOn the free plan, the instance may also spin down when idle. A subsequent request can take\nlonger while FastAPI restarts and reloads the production model from MLflow.\n\nPrediction limits: 1 to 100 messages per request, each containing 1 to 10,000 characters and\nat least one non-whitespace character. The optional threshold is between 0.0 and 1.0\n(default 0.5).\n",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://datatouille-api.onrender.com",
+      "description": "Public API hosted on Render"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Root",
+        "description": "Return a welcome message with the name and the version of the API.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RootResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Health",
+        "description": "Report whether the service is running and which model it serves.\n\nThe service is running whenever this endpoint answers. `model_loaded` tells whether\npredictions can be served.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model": {
+      "get": {
+        "tags": [
+          "Model"
+        ],
+        "summary": "Model Info",
+        "description": "Return the metadata of the model in production.\n\nThe response includes the registered name, alias and version of the model, the MLflow run\nthat produced it, and the cross-validation and test metrics recorded in that run.",
+        "operationId": "model_info_model_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInfoResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Production model not loaded"
+          },
+          "500": {
+            "description": "Unexpected internal server error"
+          }
+        }
+      }
+    },
+    "/predict": {
+      "post": {
+        "tags": [
+          "Prediction"
+        ],
+        "summary": "Predict",
+        "description": "Classify between 1 and 100 messages and optionally summarize the original text.\n\nEach message contains 1 to 10,000 nonblank characters. The threshold is the minimum\nspam probability for the `spam` label and defaults to 0.5. The result order matches\nthe input order. `confidence` is the predicted label probability;\n`spam_probability` is the spam class probability regardless of the threshold.\n\n`cloud=false` (default) tries Gemini, then the configured cloud service if needed.\n`cloud=true` bypasses Gemini. Summarization failures do not prevent classification;\nthe result `summary` is then `null`. Summarization providers receive original text,\nnot anonymized input. The returned `prediction_id` can be sent to `/feedback`.",
+        "operationId": "predict_predict_post",
+        "parameters": [
+          {
+            "name": "cloud",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cloud"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Predictions and optional summaries in the input order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                },
+                "example": {
+                  "model_name": "spam-classifier",
+                  "model_version": "1",
+                  "threshold": 0.5,
+                  "predictions": [
+                    {
+                      "prediction_id": 1,
+                      "label": "spam",
+                      "confidence": 0.98,
+                      "spam_probability": 0.98,
+                      "summary": "A promotional message claims the recipient won a phone."
+                    },
+                    {
+                      "prediction_id": 2,
+                      "label": "not_spam",
+                      "confidence": 0.97,
+                      "spam_probability": 0.03
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid value detected while processing a request"
+          },
+          "500": {
+            "description": "Unexpected internal server error"
+          },
+          "503": {
+            "description": "Production model or prediction storage is unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feedback": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Feedback",
+        "description": "Store the label that the user considers correct for a prediction.\n\nThe prediction is identified by the `prediction_id` returned by `/predict`. Each prediction\naccepts one correction. The feedback is stored with a UTC timestamp and, together with the\nstored prediction, is used to monitor and retrain the model.",
+        "operationId": "feedback_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Feedback stored successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                },
+                "example": {
+                  "id": 1,
+                  "prediction_id": 1,
+                  "created_at": "2026-11-10T10:00:00+00:00",
+                  "predicted_label": "not_spam",
+                  "corrected_label": "spam",
+                  "model_version": "1",
+                  "message": "Feedback stored"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The prediction does not exist"
+          },
+          "409": {
+            "description": "The prediction already has feedback"
+          },
+          "422": {
+            "description": "Invalid feedback payload (for example, an unsupported label)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                },
+                "examples": {
+                  "invalid_label": {
+                    "summary": "Unsupported corrected_label",
+                    "value": {
+                      "detail": [
+                        {
+                          "type": "literal_error",
+                          "loc": [
+                            "body",
+                            "corrected_label"
+                          ],
+                          "msg": "Input should be 'spam' or 'not_spam'",
+                          "input": "ham",
+                          "ctx": {
+                            "expected": "'spam' or 'not_spam'"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "missing_prediction_id": {
+                    "summary": "Missing prediction_id",
+                    "value": {
+                      "detail": [
+                        {
+                          "type": "missing",
+                          "loc": [
+                            "body",
+                            "prediction_id"
+                          ],
+                          "msg": "Field required",
+                          "input": {
+                            "corrected_label": "spam"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected internal server error"
+          },
+          "503": {
+            "description": "Prediction storage is unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FeedbackRequest": {
+        "properties": {
+          "prediction_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Prediction Id",
+            "description": "Identifier returned by /predict."
+          },
+          "corrected_label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Corrected Label",
+            "description": "Label that the user considers correct."
+          }
+        },
+        "type": "object",
+        "required": [
+          "prediction_id",
+          "corrected_label"
+        ],
+        "title": "FeedbackRequest",
+        "description": "User correction of a prediction.",
+        "examples": [
+          {
+            "corrected_label": "not_spam",
+            "prediction_id": 1
+          }
+        ]
+      },
+      "FeedbackResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "prediction_id": {
+            "type": "integer",
+            "title": "Prediction Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "predicted_label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Predicted Label"
+          },
+          "corrected_label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Corrected Label"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version",
+            "description": "Version of the model that made the prediction."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "prediction_id",
+          "created_at",
+          "predicted_label",
+          "corrected_label",
+          "model_version",
+          "message"
+        ],
+        "title": "FeedbackResponse",
+        "description": "Confirmation of a stored feedback entry."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "model_loaded": {
+            "type": "boolean",
+            "title": "Model Loaded"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "model_loaded",
+          "model_name",
+          "model_version"
+        ],
+        "title": "HealthResponse",
+        "description": "Status of the service and of the loaded model."
+      },
+      "ModelInfoResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model in the MLflow Model Registry."
+          },
+          "alias": {
+            "type": "string",
+            "title": "Alias",
+            "description": "Alias through which the model was loaded."
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Registered model version."
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id",
+            "description": "MLflow run that produced the model."
+          },
+          "metrics": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Metrics",
+            "description": "Cross-validation and test metrics."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "alias",
+          "version",
+          "run_id",
+          "metrics"
+        ],
+        "title": "ModelInfoResponse",
+        "description": "Metadata of the production model."
+      },
+      "PredictionRequest": {
+        "properties": {
+          "texts": {
+            "items": {
+              "type": "string",
+              "maxLength": 10000,
+              "minLength": 1,
+              "description": "Raw message to classify."
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Texts",
+            "description": "Messages to classify, between 1 and 100 per request."
+          },
+          "threshold": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Threshold",
+            "description": "Spam probability from which a message is labelled as spam. A higher value produces fewer false positives and more false negatives.",
+            "default": 0.5
+          }
+        },
+        "type": "object",
+        "required": [
+          "texts"
+        ],
+        "title": "PredictionRequest",
+        "description": "One or several messages to classify.",
+        "examples": [
+          {
+            "texts": [
+              "Congratulations! You won a FREE iPhone. Claim it at http://win.example",
+              "Hi team, the meeting has been moved to 3pm. Write to ana@example.com"
+            ],
+            "threshold": 0.5
+          }
+        ]
+      },
+      "PredictionResponse": {
+        "properties": {
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "predictions": {
+            "items": {
+              "$ref": "#/components/schemas/PredictionResult"
+            },
+            "type": "array",
+            "title": "Predictions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_name",
+          "model_version",
+          "threshold",
+          "predictions"
+        ],
+        "title": "PredictionResponse",
+        "description": "Predictions for a batch of messages, in the order of the request."
+      },
+      "PredictionResult": {
+        "properties": {
+          "prediction_id": {
+            "type": "integer",
+            "title": "Prediction Id",
+            "description": "Identifier to send with /feedback."
+          },
+          "label": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "not_spam"
+            ],
+            "title": "Label",
+            "description": "Predicted label."
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "Probability of the predicted label."
+          },
+          "spam_probability": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Spam Probability",
+            "description": "Probability of spam."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "Generated summary of the original message."
+          }
+        },
+        "type": "object",
+        "required": [
+          "prediction_id",
+          "label",
+          "confidence",
+          "spam_probability"
+        ],
+        "title": "PredictionResult",
+        "description": "Prediction for one message."
+      },
+      "RootResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "name",
+          "version"
+        ],
+        "title": "RootResponse",
+        "description": "Welcome message of the API."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "General",
+      "description": "Service information and health check."
+    },
+    {
+      "name": "Model",
+      "description": "Metadata of the model in production."
+    },
+    {
+      "name": "Prediction",
+      "description": "Spam classification of messages."
+    },
+    {
+      "name": "Feedback",
+      "description": "Collection of user corrections."
+    }
+  ]
+}
