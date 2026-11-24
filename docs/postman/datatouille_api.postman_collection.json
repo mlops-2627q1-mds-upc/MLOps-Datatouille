@@ -1,0 +1,1105 @@
+{
+  "info": {
+    "name": "Datatouille IMAP Spam Detection API",
+    "description": "Requests of every endpoint of the IMAP Spam Detection API, in the order of the test sequence of the README.\n\nBefore running it, open the collection, go to the **Variables** tab and set `baseUrl` (`http://127.0.0.1:8000` locally or `https://datatouille-api.onrender.com`) and `adminKey` (the value of `ADMIN_API_KEY`). The variables `A`, `B`, `C`, `F` and `G` are filled in automatically.\n\nThe requests create rows in the database and the *Cleanup* folder deletes them at the end.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. General",
+      "description": "Public endpoints that do not touch the database.",
+      "item": [
+        {
+          "name": "1. Welcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Returns the API version\", function () { pm.expect(pm.response.json()).to.have.property(\"version\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Model is loaded\", function () { pm.expect(pm.response.json().model_loaded).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Production model",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/model",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "model"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Returns the model metrics\", function () { pm.expect(pm.response.json()).to.have.property(\"metrics\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Public endpoints",
+      "description": "Classification, summarization and feedback. They do not need the X-API-Key header.",
+      "item": [
+        {
+          "name": "4. Predict (creates 2 predictions, saves A and B)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predict",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predict"
+              ]
+            },
+            "description": "Stores two rows in the `predictions` table. Their identifiers are saved in the collection variables `A` and `B`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texts\": [\n    \"WIN a FREE iPhone now!!! Claim at http://win.example\",\n    \"Hi team, the meeting is on Monday. Write to ana@example.com\"\n  ],\n  \"threshold\": 0.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "const predictions = pm.response.json().predictions;",
+                  "pm.test(\"Returns two predictions\", function () { pm.expect(predictions.length).to.eql(2); });",
+                  "pm.collectionVariables.set(\"A\", predictions[0].prediction_id);",
+                  "pm.collectionVariables.set(\"B\", predictions[1].prediction_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Summarize",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/summarize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "summarize"
+              ]
+            },
+            "description": "Requires `GEMINI_API_KEY` or `CLOUD_SUMMARIZATION_URL` on the server; otherwise it returns 502.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Hi team, the project meeting has been moved to Monday at 10. Please bring the report.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Returns a summary\", function () { pm.expect(pm.response.json().summary).to.be.a(\"string\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Create feedback for A (saves F)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback"
+              ]
+            },
+            "description": "Stores one row in the `feedback` table. Its identifier is saved in the collection variable `F`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_id\": {{A}},\n  \"corrected_label\": \"not_spam\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Corrected label is stored\", function () { pm.expect(pm.response.json().corrected_label).to.eql(\"not_spam\"); });",
+                  "pm.collectionVariables.set(\"F\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Admin: predictions",
+      "description": "CRUD of the `predictions` table. Every request sends the header `X-API-Key: {{adminKey}}`.",
+      "item": [
+        {
+          "name": "7. List predictions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions?limit=100&offset=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Includes prediction A\", function () { pm.expect(pm.response.json().map(r => r.id)).to.include(Number(pm.collectionVariables.get(\"A\"))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Get prediction B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions/{{B}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions",
+                "{{B}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Message is anonymized\", function () { pm.expect(pm.response.json().text).to.include(\"xxemail\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Create prediction (saves C)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Manual test from Postman, contact bob@example.com\",\n  \"predicted_label\": \"spam\",\n  \"spam_probability\": 0.9,\n  \"threshold\": 0.5,\n  \"model_name\": \"postman-test\",\n  \"model_version\": \"0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Text is anonymized\", function () { pm.expect(pm.response.json().text).to.not.include(\"bob@example.com\"); });",
+                  "pm.collectionVariables.set(\"C\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Replace prediction C",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions/{{C}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions",
+                "{{C}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Manual test from Postman, contact bob@example.com\",\n  \"predicted_label\": \"not_spam\",\n  \"spam_probability\": 0.2,\n  \"threshold\": 0.5,\n  \"model_name\": \"postman-test\",\n  \"model_version\": \"0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Label is updated\", function () { pm.expect(pm.response.json().predicted_label).to.eql(\"not_spam\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Admin: feedback",
+      "description": "CRUD of the `feedback` table. New entries are created with the public POST /feedback.",
+      "item": [
+        {
+          "name": "11. List feedback",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback?limit=100&offset=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Includes feedback F\", function () { pm.expect(pm.response.json().map(r => r.id)).to.include(Number(pm.collectionVariables.get(\"F\"))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Get feedback F",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback/{{F}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback",
+                "{{F}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Label is not_spam\", function () { pm.expect(pm.response.json().corrected_label).to.eql(\"not_spam\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Update feedback F",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback/{{F}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback",
+                "{{F}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corrected_label\": \"spam\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Label is updated\", function () { pm.expect(pm.response.json().corrected_label).to.eql(\"spam\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14. Delete feedback F",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback/{{F}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback",
+                "{{F}}"
+              ]
+            },
+            "description": "Deletes the feedback entry. Prediction A is kept."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15. Delete prediction B",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions/{{B}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions",
+                "{{B}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Error cases",
+      "description": "Requests that must be rejected.",
+      "item": [
+        {
+          "name": "16. List without X-API-Key (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/predictions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17. List with a wrong key (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "wrong-key",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18a. Feedback for A (201, saves G)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_id\": {{A}},\n  \"corrected_label\": \"spam\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"G\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18b. Second feedback for A (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_id\": {{A}},\n  \"corrected_label\": \"spam\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 409\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19. Feedback for an unknown prediction (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_id\": 999999999,\n  \"corrected_label\": \"spam\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20. Feedback with an invalid label (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_id\": {{A}},\n  \"corrected_label\": \"maybe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "21. Get an unknown prediction (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions",
+                "999999999"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "22. Predict without messages (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predict",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predict"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Cleanup",
+      "description": "Deletes the rows created by the collection, so the database returns to its initial state.",
+      "item": [
+        {
+          "name": "23. Delete prediction A and its feedback (cascade)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions/{{A}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions",
+                "{{A}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "24. Feedback G of A was deleted with it (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/feedback/{{G}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "feedback",
+                "{{G}}"
+              ]
+            },
+            "description": "Confirms the cascade: deleting prediction A also deleted its feedback G."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "25. Delete prediction C",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{adminKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predictions/{{C}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predictions",
+                "{{C}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "adminKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "A",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "B",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "C",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "F",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "G",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.database.settings import get_database_url
 
 
-def create_database_engine(database_url: str | None = None,) -> Engine:
+def create_database_engine(
+    database_url: str | None = None,
+) -> Engine:
     """Create a SQLAlchemy database engine."""
 
     url = make_url(database_url or get_database_url())

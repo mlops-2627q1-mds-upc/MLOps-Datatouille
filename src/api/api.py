@@ -14,25 +14,26 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import logging
 import os
+import secrets
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, Security, status
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 from google import genai
 from google.genai import errors, types
 import httpx
 import httpx2
 
 from src.api.model_loader import LoadedModel, ModelLoadError, load_production_model
-from src.api.prediction_store import (
-    FeedbackExistsError,
-    PredictionNotFoundError,
-    PredictionStore,
-)
 from src.api.schemas import (
+    FeedbackRecordResponse,
     FeedbackRequest,
     FeedbackResponse,
+    FeedbackUpdateRequest,
     HealthResponse,
     ModelInfoResponse,
+    PredictionRecordRequest,
+    PredictionRecordResponse,
     PredictionRequest,
     PredictionResponse,
     PredictionResult,
@@ -41,6 +42,7 @@ from src.api.schemas import (
     SummaryResponse,
 )
 from src.api.settings import (
+    ADMIN_API_KEY,
     API_TITLE,
     API_VERSION,
     CLOUD_CALLS_TIMEOUT,
@@ -48,19 +50,53 @@ from src.api.settings import (
     GEMINI_MODEL,
     MLFLOW_MODEL_ALIAS,
     MLFLOW_MODEL_NAME,
-    PREDICTIONS_DB_PATH,
 )
 from src.data.preprocess import anonymize_text
+from src.database.prediction_store import (
+    FeedbackExistsError,
+    FeedbackNotFoundError,
+    PostgresPredictionStore,
+    PredictionNotFoundError,
+)
 from src.modeling.predict import predict_messages
 
 logger = logging.getLogger(__name__)
 
 API_DESCRIPTION = """
-Spam detection service of the Intelligent Message Analysis Platform (IMAP).
-* **Prediction**: classify one or several messages as `spam` or `not_spam`, with the
-  probability of each label. Email addresses and phone numbers are anonymized before inference.
+Spam detection and text summarization service of the Intelligent Message Analysis Platform
+(IMAP).
+
+* **Prediction**: classify 1 to 100 messages as `spam` or `not_spam`, with the probability of
+  each label. Email addresses and phone numbers are anonymized before inference.
+* **Summary**: summarize messages with Google Gemini, with a cloud service as fallback, through
+  `/summarize` or `/predict?summary=true`.
 * **Feedback**: report the correct label of a prediction, to monitor and retrain the model.
 * **Model**: consult the version and the evaluation metrics of the model in production.
+* **Administration**: read, create, update and delete the stored predictions and feedback.
+
+### Storage
+
+Every prediction is stored in a PostgreSQL database with the anonymized message, the model
+version and a UTC timestamp. Each prediction accepts one feedback entry. The data supports drift
+monitoring and model retraining, and is kept across restarts and redeployments of the API.
+
+### Authentication
+
+The administration endpoints (tags *Admin: predictions* and *Admin: feedback*) require the
+header `X-API-Key` with the key configured on the server in `ADMIN_API_KEY`. Use the
+**Authorize** button to send it with every request. A missing or wrong key returns `401`, and the
+endpoints return `503` when no key is configured. The other endpoints are public.
+
+### Privacy
+
+Messages are anonymized for classification and storage. When a summary is requested, Gemini
+receives the anonymized message, while the cloud fallback service receives the **original**
+message. Do not submit sensitive or confidential information. There is no rate limiting.
+
+### Limits
+
+Each message has 1 to 10,000 characters, with at least one non-whitespace character. The
+optional `threshold` is between 0.0 and 1.0 (default 0.5).
 """
 
 SUMMARY_CONFIG = types.GenerateContentConfig(
@@ -79,7 +115,21 @@ TAGS_METADATA = [
     {"name": "Model", "description": "Metadata of the model in production."},
     {"name": "Prediction", "description": "Spam classification of messages."},
     {"name": "Feedback", "description": "Collection of user corrections."},
+    {"name": "Summary", "description": "Text summarization service."},
+    {
+        "name": "Admin: predictions",
+        "description": "CRUD of the stored predictions. Requires the `X-API-Key` header.",
+    },
+    {
+        "name": "Admin: feedback",
+        "description": "CRUD of the stored feedback. Requires the `X-API-Key` header.",
+    },
 ]
+
+
+def create_prediction_store() -> PostgresPredictionStore:
+    """Create the store of predictions and feedback in the PostgreSQL of ``DATABASE_URL``."""
+    return PostgresPredictionStore()
 
 
 @asynccontextmanager
@@ -108,12 +158,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.model.alias,
     )
 
-    app.state.prediction_store = PredictionStore(PREDICTIONS_DB_PATH)
+    app.state.prediction_store = create_prediction_store()
     app.state.prediction_store.initialize()
-    logger.info("Prediction database ready at %s", PREDICTIONS_DB_PATH)
+    logger.info("Prediction database (PostgreSQL) ready")
 
     yield
 
+    app.state.prediction_store.engine.dispose()
+    app.state.prediction_store = None
     app.state.model = None
 
 
@@ -184,7 +236,7 @@ def get_model(request: Request) -> LoadedModel:
     return model
 
 
-def get_prediction_store(request: Request) -> PredictionStore:
+def get_prediction_store(request: Request) -> PostgresPredictionStore:
     """
     Return the prediction store prepared at startup.
 
@@ -339,7 +391,7 @@ def predict(
     cloud: bool = False,
     summary: bool = False,
     model: LoadedModel = Depends(get_model),
-    store: PredictionStore = Depends(get_prediction_store),
+    store: PostgresPredictionStore = Depends(get_prediction_store),
 ) -> PredictionResponse:
     """
     Classify one or several messages as `spam` or `not_spam` and generate their summaries.
@@ -433,7 +485,7 @@ def summary(payload: SummaryRequest, cloud: bool = False) -> SummaryResponse:
     },
 )
 def feedback(
-    payload: FeedbackRequest, store: PredictionStore = Depends(get_prediction_store)
+    payload: FeedbackRequest, store: PostgresPredictionStore = Depends(get_prediction_store)
 ) -> FeedbackResponse:
     """
     Store the label that the user considers correct for a prediction.
@@ -457,3 +509,210 @@ def feedback(
         model_version=stored.model_version,
         message="Feedback stored",
     )
+
+
+# CRUD of the stored predictions and feedback (protected with ADMIN_API_KEY)
+
+
+ADMIN_KEY_HEADER = APIKeyHeader(
+    name="X-API-Key",
+    scheme_name="AdminApiKey",
+    description="Key of the administration endpoints, configured on the server in ADMIN_API_KEY.",
+    auto_error=False,
+)
+
+
+def require_admin_key(x_api_key: str | None = Security(ADMIN_KEY_HEADER)) -> None:
+    """
+    Allow the request only if the X-API-Key header matches ``ADMIN_API_KEY``.
+
+    Raises:
+        HTTPException: 503 if no admin key is configured, 401 if the header is missing or wrong.
+    """
+    if not ADMIN_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Admin endpoints disabled"
+        )
+    if x_api_key is None or not secrets.compare_digest(x_api_key, ADMIN_API_KEY):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+
+
+ADMIN_RESPONSES: dict[int | str, dict[str, str]] = {
+    401: {"description": "Missing or invalid X-API-Key header"},
+    503: {"description": "Admin endpoints disabled (ADMIN_API_KEY not set)"},
+}
+PAGE_LIMIT = Query(default=100, ge=1, le=500, description="Maximum number of rows to return.")
+PAGE_OFFSET = Query(default=0, ge=0, description="Number of rows to skip.")
+
+
+def not_found(error: LookupError) -> HTTPException:
+    """Build the 404 response of a missing row."""
+    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
+
+
+def prediction_columns(payload: PredictionRecordRequest) -> dict[str, object]:
+    """Columns of a prediction from a request, with the message anonymized as in /predict."""
+    columns = payload.model_dump()
+    columns["text"] = anonymize_text(payload.text)
+    return columns
+
+
+@app.get(
+    "/predictions",
+    tags=["Admin: predictions"],
+    response_model=list[PredictionRecordResponse],
+    dependencies=[Depends(require_admin_key)],
+    responses=ADMIN_RESPONSES,
+)
+def list_predictions(
+    limit: int = PAGE_LIMIT,
+    offset: int = PAGE_OFFSET,
+    store: PostgresPredictionStore = Depends(get_prediction_store),
+) -> list[PredictionRecordResponse]:
+    """List the stored predictions, ordered by id."""
+    records = store.list_predictions(limit=limit, offset=offset)
+    return [PredictionRecordResponse.model_validate(record) for record in records]
+
+
+@app.get(
+    "/predictions/{prediction_id}",
+    tags=["Admin: predictions"],
+    response_model=PredictionRecordResponse,
+    dependencies=[Depends(require_admin_key)],
+    responses={**ADMIN_RESPONSES, 404: {"description": "The prediction does not exist"}},
+)
+def get_prediction(
+    prediction_id: int, store: PostgresPredictionStore = Depends(get_prediction_store)
+) -> PredictionRecordResponse:
+    """Return one stored prediction."""
+    try:
+        return PredictionRecordResponse.model_validate(store.get_prediction(prediction_id))
+    except PredictionNotFoundError as error:
+        raise not_found(error) from error
+
+
+@app.post(
+    "/predictions",
+    tags=["Admin: predictions"],
+    response_model=PredictionRecordResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_key)],
+    responses=ADMIN_RESPONSES,
+)
+def create_prediction(
+    payload: PredictionRecordRequest,
+    store: PostgresPredictionStore = Depends(get_prediction_store),
+) -> PredictionRecordResponse:
+    """Store a prediction given all its columns. The message is anonymized before storage."""
+    record = store.create_prediction(**prediction_columns(payload))
+    return PredictionRecordResponse.model_validate(record)
+
+
+@app.put(
+    "/predictions/{prediction_id}",
+    tags=["Admin: predictions"],
+    response_model=PredictionRecordResponse,
+    dependencies=[Depends(require_admin_key)],
+    responses={**ADMIN_RESPONSES, 404: {"description": "The prediction does not exist"}},
+)
+def update_prediction(
+    prediction_id: int,
+    payload: PredictionRecordRequest,
+    store: PostgresPredictionStore = Depends(get_prediction_store),
+) -> PredictionRecordResponse:
+    """Replace all the columns of a stored prediction (except its id and creation time)."""
+    try:
+        record = store.update_prediction(prediction_id, **prediction_columns(payload))
+    except PredictionNotFoundError as error:
+        raise not_found(error) from error
+    return PredictionRecordResponse.model_validate(record)
+
+
+@app.delete(
+    "/predictions/{prediction_id}",
+    tags=["Admin: predictions"],
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_key)],
+    responses={**ADMIN_RESPONSES, 404: {"description": "The prediction does not exist"}},
+)
+def delete_prediction(
+    prediction_id: int, store: PostgresPredictionStore = Depends(get_prediction_store)
+) -> Response:
+    """Delete a stored prediction and its feedback."""
+    try:
+        store.delete_prediction(prediction_id)
+    except PredictionNotFoundError as error:
+        raise not_found(error) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get(
+    "/feedback",
+    tags=["Admin: feedback"],
+    response_model=list[FeedbackRecordResponse],
+    dependencies=[Depends(require_admin_key)],
+    responses=ADMIN_RESPONSES,
+)
+def list_feedback(
+    limit: int = PAGE_LIMIT,
+    offset: int = PAGE_OFFSET,
+    store: PostgresPredictionStore = Depends(get_prediction_store),
+) -> list[FeedbackRecordResponse]:
+    """List the stored feedback, ordered by id. New feedback is created with POST /feedback."""
+    records = store.list_feedback(limit=limit, offset=offset)
+    return [FeedbackRecordResponse.model_validate(record) for record in records]
+
+
+@app.get(
+    "/feedback/{feedback_id}",
+    tags=["Admin: feedback"],
+    response_model=FeedbackRecordResponse,
+    dependencies=[Depends(require_admin_key)],
+    responses={**ADMIN_RESPONSES, 404: {"description": "The feedback does not exist"}},
+)
+def get_feedback(
+    feedback_id: int, store: PostgresPredictionStore = Depends(get_prediction_store)
+) -> FeedbackRecordResponse:
+    """Return one stored feedback entry."""
+    try:
+        return FeedbackRecordResponse.model_validate(store.get_feedback(feedback_id))
+    except FeedbackNotFoundError as error:
+        raise not_found(error) from error
+
+
+@app.put(
+    "/feedback/{feedback_id}",
+    tags=["Admin: feedback"],
+    response_model=FeedbackRecordResponse,
+    dependencies=[Depends(require_admin_key)],
+    responses={**ADMIN_RESPONSES, 404: {"description": "The feedback does not exist"}},
+)
+def update_feedback(
+    feedback_id: int,
+    payload: FeedbackUpdateRequest,
+    store: PostgresPredictionStore = Depends(get_prediction_store),
+) -> FeedbackRecordResponse:
+    """Change the corrected label of a stored feedback entry."""
+    try:
+        record = store.update_feedback(feedback_id, payload.corrected_label)
+    except FeedbackNotFoundError as error:
+        raise not_found(error) from error
+    return FeedbackRecordResponse.model_validate(record)
+
+
+@app.delete(
+    "/feedback/{feedback_id}",
+    tags=["Admin: feedback"],
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_key)],
+    responses={**ADMIN_RESPONSES, 404: {"description": "The feedback does not exist"}},
+)
+def delete_feedback(
+    feedback_id: int, store: PostgresPredictionStore = Depends(get_prediction_store)
+) -> Response:
+    """Delete a stored feedback entry. Its prediction is kept."""
+    try:
+        store.delete_feedback(feedback_id)
+    except FeedbackNotFoundError as error:
+        raise not_found(error) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
