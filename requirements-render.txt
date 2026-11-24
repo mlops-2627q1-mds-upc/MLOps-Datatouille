@@ -12,4 +12,6 @@ nltk==3.9.2
 python-dotenv==1.2.4
 SQLAlchemy>=2.0,<3.0
 psycopg[binary]>=3.2,<4.0
+SQLAlchemy>=2.0,<3.0
+psycopg[binary]>=3.2,<4.0
 -e .
