@@ -1,0 +1,18 @@
+# Local run of the API. From the repo root: docker compose -f docker/compose.yaml up --build
+# Paths are relative to this file. The model is loaded from the MLflow Registry at startup.
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: imap-api
+    container_name: imap-api
+    env_file: ../.env
+    ports:
+      - "8080:8080"
+    volumes:
+      - imap-data:/app/data/api
+
+volumes:
+  imap-data:
+    name: imap-data  # same volume as the plain `docker run` in the README
