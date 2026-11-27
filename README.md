@@ -130,6 +130,33 @@ uvicorn src.api.api:app --host 0.0.0.0 --port 8080   # server (e.g. the FIB virt
 
 The interactive documentation is available at `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc`.
 
+### 4b. Run with Docker
+
+The image contains only the API code and its runtime dependencies (`requirements-api.txt`, same pins as `requirements.txt`). It has no model, data or secrets: the model is loaded from the MLflow Registry at startup and the credentials are passed at runtime.
+
+```bash
+docker build -t imap-api .
+docker run -d --name imap-api --env-file .env -p 8080:8080 -v imap-data:/app/data/api imap-api
+docker ps                       # STATUS becomes "healthy" once the model is loaded
+docker logs imap-api
+```
+
+* **Environment variables**: the same as the table above, read from `.env` with `--env-file`. `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` are required. Do not set `PREDICTIONS_DB_PATH` (the default `/app/data/api/predictions.db` is inside the volume).
+* **Volume**: the SQLite database lives in the named volume `imap-data`, mounted at `/app/data/api`. Predictions persist after `docker rm -f imap-api` and a new `docker run` with the same volume.
+* **Port**: `8080`. Health check: `GET /health`.
+* **Single worker**: SQLite and one copy of the model in memory.
+* **Startup failure**: if the credentials are wrong or the alias does not exist, the container exits and `docker logs imap-api` shows a `ModelLoadError`.
+* **Python version**: the model is a pickle, so the image Python must match the one that trained it. Change it with `docker build --build-arg PYTHON_VERSION=3.13 -t imap-api .`.
+
+#### Promote or roll back a model
+
+The image does not change when the served model changes. Move the `production` alias in the MLflow Registry (`python -m src.modeling.register ...` to promote a new version, or reassign the alias to a previous version in the MLflow UI to roll back), then restart the container so it loads the new version:
+
+```bash
+docker restart imap-api
+curl http://localhost:8080/model   # check the served version
+```
+
 ### 5. Endpoints
 
 | Method | Path | Description |
